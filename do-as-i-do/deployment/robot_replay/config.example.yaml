@@ -1,0 +1,37 @@
+# Deployment config for robot_replay (UR3e arms + Sharpa Wave hands).
+#
+# Copy this to config.yaml and fill in your facility's real robot IPs and hand
+# serial numbers. config.yaml is gitignored — it holds machine-specific values.
+#
+#   cp config.example.yaml config.yaml   # then edit arm_ip / hand_sn
+
+# Path to the vendored Sharpa Wave SDK python bindings, relative to robot_replay/.
+# The SDK is proprietary and NOT shipped in the repo — drop it into
+# robot_replay/Sharpa/ (which is gitignored).
+sharpa_sdk_path: ./Sharpa/SDK/SharpaWaveSDK_4_3_4/python
+
+left:
+  arm_ip: 192.168.x.x          # left UR3e RTDE IP
+  hand_sn: REPLACE_ME          # left Sharpa hand serial
+  servoj_lookahead: 0.1        # ur_rtde servoJ lookahead time (s)
+  servoj_gain: 300             # ur_rtde servoJ proportional gain
+  home_arm_q:                  # 6 joint angles (rad): pan, lift, elbow, w1, w2, w3
+    - -1.8307955900775355
+    - -1.5707963267948966
+    - 0.0
+    - -3.141592653589793
+    - -1.5707963267948966
+    - 3.9269908169872414
+
+right:
+  arm_ip: 192.168.x.x          # right UR3e RTDE IP
+  hand_sn: REPLACE_ME          # right Sharpa hand serial
+  servoj_lookahead: 0.03
+  servoj_gain: 600
+  home_arm_q:
+    - 2.023838758468628
+    - -1.5707963267948966
+    - 0.0
+    - 0.0
+    - 1.5707963267948966
+    - -3.9269908169872414

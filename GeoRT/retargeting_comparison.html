@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3 Hand-Retargeting Methods, Compared</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --card2:#1e2230; --ink:#e7eaf0; --mut:#9aa3b2;
+    --geo:#6ea8fe; --topo:#7ef0c2; --spider:#ff8fb1; --warn:#ffcf6e; --line:#2a2f3a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1000px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:36px;line-height:1.15;margin:0 0 10px}
+  h1 .sub{display:block;font-size:17px;color:var(--mut);font-weight:400;margin-top:10px}
+  h2{font-size:25px;margin:54px 0 14px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:19px;margin:22px 0 8px}
+  p{margin:12px 0}
+  a{color:var(--geo)}
+  .tag{display:inline-block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--geo);border:1px solid var(--line);border-radius:999px;padding:3px 10px;margin-right:6px}
+  .lead{font-size:18px;color:#cfd6e2}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13px;
+    background:#0b0d12;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#cfe2ff}
+  .pill{font-size:12.5px;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:10px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  td.geo{color:#cfe0ff}  td.topo{color:#cdf6e6}  td.spider{color:#ffd6e2}
+  .yes{color:#7ef0c2;font-weight:600} .no{color:#ff8fb1;font-weight:600} .mid{color:#ffcf6e;font-weight:600}
+  /* spectrum */
+  .spectrum{display:flex;gap:0;margin:24px 0;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  .spectrum>div{flex:1;padding:18px 16px}
+  .s1{background:linear-gradient(180deg,#16233a,#131722)}
+  .s2{background:linear-gradient(180deg,#13302a,#131722)}
+  .s3{background:linear-gradient(180deg,#341622,#131722)}
+  .spectrum h4{margin:0 0 4px;font-size:15px} .spectrum p{margin:4px 0;font-size:13px;color:var(--mut)}
+  .axis{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin:6px 4px 0}
+  /* method cards */
+  .m{border-radius:14px;border:1px solid var(--line);padding:20px 22px;margin:18px 0}
+  .m.geo{border-left:4px solid var(--geo)} .m.topo{border-left:4px solid var(--topo)} .m.spider{border-left:4px solid var(--spider)}
+  .m h3{margin-top:0}
+  .m .name{font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+  .m.geo .name{color:var(--geo)} .m.topo .name{color:var(--topo)} .m.spider .name{color:var(--spider)}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px;margin:12px 0;font-size:14.5px}
+  .kv b{color:var(--mut);font-weight:600}
+  ul{margin:10px 0;padding-left:20px} li{margin:5px 0}
+  /* pipeline */
+  .flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:18px 0}
+  .step{flex:1;min-width:150px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .step .n{font-size:11px;font-weight:700;letter-spacing:.04em}
+  .step b{display:block;margin:4px 0 6px;font-size:15px}
+  .step span{font-size:13px;color:var(--mut)}
+  .arrow{align-self:center;color:var(--mut);font-size:22px}
+  .note{background:#1a1c12;border:1px solid #3a3a1f;border-radius:10px;padding:12px 16px;color:#e9e3bf;font-size:14.5px}
+  .warnote{background:#1c1216;border:1px solid #3a1f28;border-radius:10px;padding:12px 16px;color:#f0cdd6;font-size:14.5px}
+  .footer{margin-top:60px;color:var(--mut);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">Method comparison</span>
+  <h1>Three ways to retarget a hand
+    <span class="sub">GeoRT vs. TopoRetarget vs. SPIDER — and how to combine them so a robot hand can
+    reproduce a <b>physics-correct</b> human–object interaction seen in video.</span>
+  </h1>
+
+  <p class="lead">All three solve "human hand → robot hand," but they care about <b>different things</b>.
+  Think of them as a spectrum: from <span style="color:var(--geo)">copy the motion fast</span> →
+  <span style="color:var(--topo)">copy the contact with the object</span> →
+  <span style="color:var(--spider)">make the physics actually work</span>.</p>
+
+  <!-- spectrum -->
+  <div class="spectrum">
+    <div class="s1">
+      <h4 style="color:var(--geo)">GeoRT</h4>
+      <p>Preserves <b>fingertip motion</b> (direction, range, smoothness, pinch). No object. Real-time.</p>
+    </div>
+    <div class="s2">
+      <h4 style="color:var(--topo)">TopoRetarget</h4>
+      <p>Preserves <b>hand–object contact structure</b>. Geometrically feasible (no penetration).</p>
+    </div>
+    <div class="s3">
+      <h4 style="color:var(--spider)">SPIDER</h4>
+      <p>Preserves <b>dynamic feasibility</b> — forces, contact sequences, real physics in sim.</p>
+    </div>
+  </div>
+  <div class="axis"><span>← faster, simpler, kinematic</span><span>more object-aware &amp; physically correct →</span></div>
+
+  <!-- ============================================================= -->
+  <h2>1. Side-by-side</h2>
+  <table>
+    <tr>
+      <th>Property</th>
+      <th style="color:var(--geo)">GeoRT<br><span class="pill">2503.07541</span></th>
+      <th style="color:var(--topo)">TopoRetarget<br><span class="pill">2606.16272</span></th>
+      <th style="color:var(--spider)">SPIDER<br><span class="pill">2511.09484</span></th>
+    </tr>
+    <tr><td>Full name</td>
+      <td class="geo">Geometric Retargeting</td>
+      <td class="topo">Interaction-Preserving Retargeting</td>
+      <td class="spider">Scalable Physics-Informed Dexterous Retargeting</td></tr>
+    <tr><td>What it preserves</td>
+      <td class="geo">Fingertip motion: direction, workspace coverage, flatness, pinch</td>
+      <td class="topo">Hand–object <b>contact topology</b> (which finger touches what, where)</td>
+      <td class="spider"><b>Dynamic feasibility</b>: contact forces &amp; sequences over time</td></tr>
+    <tr><td>Aware of the object?</td>
+      <td class="no">No</td>
+      <td class="yes">Yes — graph of hand + object keypoints</td>
+      <td class="yes">Yes — object is in the physics sim</td></tr>
+    <tr><td>Physics-correct?</td>
+      <td class="no">No (pure kinematics)</td>
+      <td class="mid">Partial — geometric feasibility, penetration handling, no dynamics</td>
+      <td class="yes">Yes — full simulation, forces &amp; torques</td></tr>
+    <tr><td>How it works</td>
+      <td class="geo">Tiny per-finger neural net, trained once; 5 geometric losses</td>
+      <td class="topo">Optimization: distance-weighted Laplacian deformation + directional consistency + kinematic constraints</td>
+      <td class="spider">Large-scale sim with curriculum "virtual contact guidance" + contact refinement</td></tr>
+    <tr><td>Input</td>
+      <td class="geo">Human fingertip keypoints (live)</td>
+      <td class="topo">Human hand–object demonstration (keypoints)</td>
+      <td class="spider">Kinematic human motion (mocap / video-extracted / VR)</td></tr>
+    <tr><td>Output</td>
+      <td class="geo">Robot joint angles, per frame</td>
+      <td class="topo">Retargeted robot hand trajectory preserving interaction</td>
+      <td class="spider">Dynamically feasible robot trajectory (deployable / RL data)</td></tr>
+    <tr><td>Speed</td>
+      <td class="geo"><b>~1 kHz</b>, real-time teleop</td>
+      <td class="topo">Per-trajectory optimization (offline)</td>
+      <td class="spider">Offline, but ~10× faster than RL baselines</td></tr>
+    <tr><td>Takes raw video?</td>
+      <td class="no">No (uses a separate mocap front-end, e.g. MediaPipe)</td>
+      <td class="no">No (needs extracted hand+object keypoints)</td>
+      <td class="no">No (needs extracted kinematics)</td></tr>
+    <tr><td>Headline result</td>
+      <td class="geo">SOTA speed/accuracy, far fewer hyperparameters</td>
+      <td class="topo">+40.6 pts on Pen-Spin; zero-shot transfer to Wuji hand</td>
+      <td class="spider">+18% success vs. sampling; 9 embodiments, 6 datasets, 2.4M frames</td></tr>
+    <tr><td>Sweet spot</td>
+      <td class="geo">Live teleoperation</td>
+      <td class="topo">Faithful contact transfer for imitation/RL</td>
+      <td class="spider">Generating physically valid robot data at scale</td></tr>
+  </table>
+
+  <!-- ============================================================= -->
+  <h2>2. Each method in its own words</h2>
+
+  <div class="m geo">
+    <div class="name">Method 1 · arXiv 2503.07541</div>
+    <h3>GeoRT — copy the <i>motion</i>, instantly</h3>
+    <div class="kv">
+      <b>Idea</b><div>Train a tiny per-finger neural network so the robot fingertip mimics your fingertip,
+        using 5 geometric rules: cover the full workspace, move in the same direction, respond smoothly,
+        match pinches, avoid self-collision.</div>
+      <b>Strength</b><div>Blazing fast (1 kHz), unsupervised (no labeled hand pairs), very few knobs.</div>
+      <b>Limit for you</b><div>It has <b>no concept of the object</b>. It matches fingertips in free space —
+        it won't guarantee the robot actually grips the mug or that forces are right.</div>
+    </div>
+  </div>
+
+  <div class="m topo">
+    <div class="name">Method 2 · arXiv 2606.16272</div>
+    <h3>TopoRetarget — copy the <i>contact</i> with the object</h3>
+    <div class="kv">
+      <b>Idea</b><div>Build a sparse <b>interaction graph</b> linking hand keypoints and object keypoints, then
+        deform the robot pose so the same contacts are preserved — while penalizing penetration and respecting
+        the robot's joint limits.</div>
+      <b>Strength</b><div>Keeps the <b>task-relevant interaction</b> intact (the finger that pressed the pen still
+        presses the pen). One parameter set generalizes across robot hands; strong RL results.</div>
+      <b>Limit for you</b><div>It enforces <b>geometric</b> correctness (contacts, no interpenetration) but not the
+        full <b>dynamics</b> — it doesn't simulate whether forces/inertia make the grasp actually hold.</div>
+    </div>
+  </div>
+
+  <div class="m spider">
+    <div class="name">Method 3 · arXiv 2511.09484</div>
+    <h3>SPIDER — make the <i>physics</i> actually work</h3>
+    <div class="kv">
+      <b>Idea</b><div>Take the human's kinematic motion as a "sketch," then use <b>large-scale physics simulation</b>
+        with curriculum virtual-contact guidance to push it into a trajectory the robot can <b>actually execute</b>
+        — correct contact timing, forces, dynamic feasibility.</div>
+      <b>Strength</b><div>Output is <b>physics-correct and deployable</b>. Scales across 9 embodiments / 6 datasets,
+        producing a 2.4M-frame dataset; much faster than pure RL.</div>
+      <b>Limit for you</b><div>Offline and heavier; it refines an existing motion rather than perceiving one —
+        it still needs the human motion handed to it.</div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>3. Your goal: video of human–object interaction → physics-correct robot</h2>
+
+  <div class="warnote">⚠️ <b>Reality check:</b> none of the three takes raw <b>video</b> directly. They all assume the
+  hand (and, for the latter two, the object) has already been turned into keypoints/poses. So the "visual input"
+  part is a <b>perception stage you add in front</b> — none of these papers solves it.</div>
+
+  <p>Because they sit at different points on the spectrum, the right move is to <b>chain them</b>, not pick one.
+  A pipeline that matches your aim:</p>
+
+  <div class="flow">
+    <div class="step" style="border-color:#3a3a1f"><div class="n" style="color:var(--warn)">STAGE 0 · PERCEPTION (not in these papers)</div>
+      <b>Video → hand + object pose</b>
+      <span>Hand-object reconstruction from video (e.g. HaMeR/MANO for the hand, 6-DoF pose or mesh for the object).
+      This produces the keypoints the methods below consume.</span></div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--topo)"><div class="n" style="color:var(--topo)">STAGE 1 · INTERACTION</div>
+      <b>TopoRetarget</b>
+      <span>Map the human hand–object contacts onto the robot hand, preserving <i>which</i> contacts happen and
+      avoiding penetration. Gives a geometrically faithful robot trajectory.</span></div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--spider)"><div class="n" style="color:var(--spider)">STAGE 2 · PHYSICS</div>
+      <b>SPIDER</b>
+      <span>Push that trajectory through physics simulation so the grasp/manipulation is <i>dynamically feasible</i>
+      — correct forces and contact timing. This is what makes it "physics-correct."</span></div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--geo)"><div class="n" style="color:var(--geo)">STAGE 3 · (optional) LIVE</div>
+      <b>GeoRT</b>
+      <span>If you also want <i>real-time teleop</i> rather than replaying a recorded clip, GeoRT gives the
+      1 kHz human→robot mapping. (Object-agnostic, so it's the live driver, not the physics guarantor.)</span></div>
+  </div>
+
+  <div class="note">🎯 <b>Bottom line for your aim:</b> the method that most directly delivers
+  "physics-correct robot reproduction of an interaction" is <b>SPIDER</b>, with <b>TopoRetarget</b> as the
+  natural front-end that gets the contacts right before physics refinement. <b>GeoRT</b> is the odd one out for
+  this specific goal — it's the best <i>real-time teleoperation</i> mapper, but it ignores the object and the
+  dynamics, so on its own it cannot guarantee a physics-correct interaction.</div>
+
+  <h3>Quick decision guide</h3>
+  <table>
+    <tr><th>If you want…</th><th>Use</th></tr>
+    <tr><td>A human to puppeteer the robot live, in real time</td><td class="geo">GeoRT</td></tr>
+    <tr><td>To transfer a recorded grasp so the robot touches the object the same way</td><td class="topo">TopoRetarget</td></tr>
+    <tr><td>A robot trajectory that is physically executable (forces/contacts valid)</td><td class="spider">SPIDER</td></tr>
+    <tr><td><b>Video of an interaction → physics-correct robot interaction</b> (your goal)</td>
+        <td><b>Perception → TopoRetarget → SPIDER</b></td></tr>
+  </table>
+
+  <div class="footer">
+    Summaries of TopoRetarget (2606.16272) and SPIDER (2511.09484) are drawn from their arXiv abstract pages;
+    GeoRT (2503.07541) is grounded in its paper + this repo's source. Stage 0 (video→pose) and exact interfaces
+    between stages are not specified by the papers and would need engineering — treat the pipeline as a proposed
+    architecture, not a published one.
+  </div>
+
+</div>
+</body>
+</html>

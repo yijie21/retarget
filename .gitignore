@@ -1,0 +1,81 @@
+# ============================================================================
+#  retarget monorepo — .gitignore
+#  Excludes: (1) files over GitHub's 100 MB hard limit, (2) license-gated data
+#  (MANO / SMPL-H / GRAB / ContactDB), (3) multi-GB model weights.
+#
+#  ⚠️  .gitignore does NOT untrack files already committed. If something here was
+#      committed before, also run:  git rm -r --cached <path>   then commit.
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# toporetarget/ — license-gated data (NOT redistributable; also the >100 MB blockers)
+#   grab_s1.zip 626 MB · mano_v1_2.zip 167 MB · SMPLH_*.pkl 124 MB each
+# ---------------------------------------------------------------------------
+toporetarget/grab_raw/
+toporetarget/models/
+
+# ---------------------------------------------------------------------------
+# do-as-i-do/ — ~25 GB gated weights (facebook/sam-3d-objects, HaWoR, Metric3D, TAPIR)
+# ---------------------------------------------------------------------------
+do-as-i-do/reconstruction/weights/
+do-as-i-do/reconstruction/modules/**/weights/
+do-as-i-do/reconstruction/modules/**/checkpoints/
+do-as-i-do/reconstruction/modules/HaWoR/_DATA/
+do-as-i-do/reconstruction/modules/sam-3d-objects/notebook/images/
+do-as-i-do/retargeting/outputs/
+
+# ---------------------------------------------------------------------------
+# spider/ — HuggingFace LFS example datasets (~866 MB)
+# ---------------------------------------------------------------------------
+spider/example_datasets/
+
+# ---------------------------------------------------------------------------
+# GeoRT/ — gated GRAB demo data (see GeoRT/DATA_NOTICE.md)
+# ---------------------------------------------------------------------------
+GeoRT/data/grab_*
+
+# ---------------------------------------------------------------------------
+# Model weights / large binaries by extension (anywhere in the tree)
+#   To keep a specific small file:  !path/to/keep.ext
+# ---------------------------------------------------------------------------
+*.ckpt
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.onnx
+*.h5
+*.pkl
+
+# ---------------------------------------------------------------------------
+# Archives & large media (regenerate / download locally instead of committing)
+# ---------------------------------------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.mp4
+*.mov
+*.avi
+
+# ---------------------------------------------------------------------------
+# Python / build / env artifacts
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.so
+build/
+dist/
+.venv/
+.uv/
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Editor / OS / logs
+# ---------------------------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.log

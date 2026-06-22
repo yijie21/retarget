@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How SAM-3D Becomes a Video Tracker — Guided Flow, Explained</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --card2:#1e2230; --ink:#e7eaf0; --mut:#9aa3b2;
+    --blue:#6ea8fe; --green:#7ef0c2; --warn:#ffcf6e; --pink:#ff8fb1; --purple:#c4a0ff; --line:#2a2f3a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1000px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:34px;line-height:1.16;margin:0 0 10px}
+  h1 .sub{display:block;font-size:17px;color:var(--mut);font-weight:400;margin-top:10px}
+  h2{font-size:25px;margin:56px 0 14px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:19px;margin:24px 0 8px;color:var(--green)}
+  p{margin:12px 0}
+  a{color:var(--blue)}
+  .tag{display:inline-block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--blue);border:1px solid var(--line);border-radius:999px;padding:3px 10px;margin-right:6px}
+  .lead{font-size:18px;color:#cfd6e2}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+    background:#0b0d12;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#cfe2ff}
+  pre{background:#0b0d12;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow:auto;margin:10px 0}
+  pre code{background:none;border:none;padding:0;color:#d7e2f4;font-size:12.5px;line-height:1.6}
+  .eq{background:#0b0d12;border:1px solid var(--line);border-left:3px solid var(--purple);border-radius:8px;
+    padding:14px 18px;margin:14px 0;font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:14.5px;
+    color:#e6ddff;overflow-x:auto}
+  .eq .lbl{float:right;color:var(--mut);font-family:-apple-system,sans-serif;font-size:12px}
+  .fig{background:#0d0f14;border:1px solid var(--line);border-radius:14px;padding:18px;margin:22px 0;text-align:center}
+  .fig svg{max-width:100%;height:auto}
+  .cap{font-size:13.5px;color:var(--mut);margin-top:12px;text-align:left}
+  .cap b{color:#cdd6e4}
+  .evidence{background:#0b0d12;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;
+    padding:10px 14px;margin:12px 0;font-size:13px;color:#bcd0ee}
+  .evidence b{color:#dce8fb}
+  .warnote{background:#1c1a12;border:1px solid #3a341f;border-radius:10px;padding:12px 16px;color:#efe6c6;font-size:14px}
+  ul{margin:10px 0;padding-left:22px} li{margin:6px 0}
+  .key{color:var(--green);font-weight:600}
+  .footer{margin-top:60px;color:var(--mut);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
+  .muted{color:var(--mut)}
+  .legtag{font-family:-apple-system,sans-serif;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">Deep dive</span><span class="tag">Do As I Do · reconstruction</span>
+  <h1>How a single-image 3D model becomes a video tracker
+    <span class="sub">The exact mechanism behind <i>“guided diffusion tracking”</i> — turning SAM-3D (which only
+    reconstructs an object from <b>one</b> picture) into a temporally consistent 6-DoF pose tracker, <b>without any
+    training</b>. Grounded in the paper's equations and the real <code>track_object.py</code> command line.</span>
+  </h1>
+
+  <p class="lead">The whole trick rests on one idea: a generative model doesn't just produce an answer — it produces
+  it through a <b>controllable trajectory</b> (noise → sample). If you can gently <b>steer that trajectory</b> while
+  it runs, you get new behavior for free. Here, the steering turns "guess the object" into "track the object."</p>
+
+  <!-- ============================================================= -->
+  <h2>1. The problem in one picture</h2>
+
+  <div class="fig">
+    <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,sans-serif">
+      <!-- top row: naive -->
+      <text x="20" y="30" fill="#ff8fb1" font-size="14" font-weight="700">❌ Naive: run SAM-3D independently every frame</text>
+      <g>
+        <!-- frame boxes with slightly different shapes -->
+        <g transform="translate(40,50)">
+          <rect width="150" height="100" rx="8" fill="#12151c" stroke="#2a2f3a"/>
+          <ellipse cx="75" cy="50" rx="42" ry="30" fill="none" stroke="#ff8fb1" stroke-width="2.5" transform="rotate(-6 75 50)"/>
+          <text x="75" y="118" fill="#9aa3b2" font-size="11" text-anchor="middle">frame 1</text>
+        </g>
+        <g transform="translate(220,50)">
+          <rect width="150" height="100" rx="8" fill="#12151c" stroke="#2a2f3a"/>
+          <ellipse cx="75" cy="50" rx="48" ry="26" fill="none" stroke="#ff8fb1" stroke-width="2.5" transform="rotate(10 75 50)"/>
+          <text x="75" y="118" fill="#9aa3b2" font-size="11" text-anchor="middle">frame 2</text>
+        </g>
+        <g transform="translate(400,50)">
+          <rect width="150" height="100" rx="8" fill="#12151c" stroke="#2a2f3a"/>
+          <ellipse cx="75" cy="50" rx="38" ry="34" fill="none" stroke="#ff8fb1" stroke-width="2.5" transform="rotate(-2 75 50)"/>
+          <text x="75" y="118" fill="#9aa3b2" font-size="11" text-anchor="middle">frame 3</text>
+        </g>
+        <text x="600" y="105" fill="#ff8fb1" font-size="13">shape &amp; size</text>
+        <text x="600" y="123" fill="#ff8fb1" font-size="13"><tspan font-weight="700">jitters</tspan> every frame</text>
+      </g>
+      <!-- bottom row: fixed shape -->
+      <text x="20" y="195" fill="#7ef0c2" font-size="14" font-weight="700">✅ Idea: fix the shape once (anchor frame), then track only the POSE</text>
+      <g>
+        <g transform="translate(40,210)">
+          <rect width="150" height="100" rx="8" fill="#12151c" stroke="#285043"/>
+          <ellipse cx="75" cy="50" rx="44" ry="28" fill="none" stroke="#7ef0c2" stroke-width="2.5" transform="rotate(-8 75 50)"/>
+          <text x="75" y="118" fill="#9aa3b2" font-size="11" text-anchor="middle">frame 1 · anchor 🔒</text>
+        </g>
+        <g transform="translate(220,210)">
+          <rect width="150" height="100" rx="8" fill="#12151c" stroke="#285043"/>
+          <ellipse cx="75" cy="50" rx="44" ry="28" fill="none" stroke="#7ef0c2" stroke-width="2.5" transform="rotate(14 75 50)"/>
+          <text x="75" y="118" fill="#9aa3b2" font-size="11" text-anchor="middle">frame 2</text>
+        </g>
+        <g transform="translate(400,210)">
+          <rect width="150" height="100" rx="8" fill="#12151c" stroke="#285043"/>
+          <ellipse cx="75" cy="50" rx="44" ry="28" fill="none" stroke="#7ef0c2" stroke-width="2.5" transform="rotate(34 75 50)"/>
+          <text x="75" y="118" fill="#9aa3b2" font-size="11" text-anchor="middle">frame 3</text>
+        </g>
+        <text x="600" y="255" fill="#7ef0c2" font-size="13"><tspan font-weight="700">same</tspan> shape, only the</text>
+        <text x="600" y="273" fill="#7ef0c2" font-size="13">orientation changes →</text>
+      </g>
+    </svg>
+    <div class="cap"><b>Figure 1.</b> SAM-3D is a single-image reconstructor. Calling it once per frame gives a
+    <i>different</i> mesh each time — the object appears to morph (top). The fix: lock the shape at one
+    <span class="key">anchor frame</span> and let only the 6-DoF <b>pose</b> (position + rotation) vary across
+    frames (bottom). That converts an instance-reconstruction model into a tracker.</div>
+  </div>
+
+  <p>But there's a catch: SAM-3D doesn't have a "pose-only" mode you can just call. Pose and shape come out
+  <i>together</i> from one generative process. So how do you hold one fixed and move the other? That's where the
+  generative trajectory and guidance come in.</p>
+
+  <!-- ============================================================= -->
+  <h2>2. Background: SAM-3D generates by <i>flowing</i> from noise</h2>
+  <p>SAM-3D is a <b>flow-matching</b> model (a close cousin of diffusion). To produce an output it starts from pure
+  random noise <code>ε</code> and integrates a learned <b>velocity field</b> <code>v<sub>θ</sub></code> over a series
+  of small steps until it lands on a realistic sample. Think of a particle released in fog, with the network telling
+  it which way to drift at every instant until it reaches "a valid object."</p>
+
+  <div class="fig">
+    <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,sans-serif">
+      <!-- manifold -->
+      <path d="M60,170 Q300,200 560,150 T820,120" fill="none" stroke="#285043" stroke-width="2" stroke-dasharray="5 4"/>
+      <text x="700" y="195" fill="#7ef0c2" font-size="12">manifold of valid (shape, pose)</text>
+      <!-- start noise -->
+      <circle cx="80" cy="60" r="7" fill="#ff8fb1"/>
+      <text x="60" y="45" fill="#ff8fb1" font-size="12">ε  (noise)</text>
+      <!-- integration steps -->
+      <g stroke="#6ea8fe" stroke-width="2.5" fill="#6ea8fe">
+        <line x1="80" y1="60" x2="180" y2="78" marker-end="url(#a)"/>
+        <line x1="180" y1="78" x2="290" y2="100" marker-end="url(#a)"/>
+        <line x1="290" y1="100" x2="410" y2="120" marker-end="url(#a)"/>
+        <line x1="410" y1="120" x2="520" y2="138" marker-end="url(#a)"/>
+      </g>
+      <circle cx="520" cy="138" r="7" fill="#7ef0c2"/>
+      <text x="500" y="125" fill="#7ef0c2" font-size="12">final sample</text>
+      <text x="210" y="70" fill="#6ea8fe" font-size="12">v<tspan baseline-shift="sub" font-size="9">θ</tspan> · Δ  (one Euler step)</text>
+      <text x="60" y="215" fill="#9aa3b2" font-size="12">25 small steps (<tspan fill="#cfe2ff">--euler_steps 25</tspan>) carry noise → a clean object estimate</text>
+      <defs>
+        <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+          <path d="M0,0 L9,4.5 L0,9 z" fill="#6ea8fe"/>
+        </marker>
+      </defs>
+    </svg>
+    <div class="cap"><b>Figure 2.</b> Flow-matching generation = integrating a velocity field from noise to a sample
+    over a handful of Euler steps. The pipeline uses <b>25 steps</b>. Nothing here is trained at run time — the field
+    <code>v<sub>θ</sub></code> is the frozen pretrained SAM-3D.</div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>3. The core trick: bend the flow toward what you already know</h2>
+  <p>Normally each Euler step just follows <code>v<sub>θ</sub></code> wherever it points. <b>Guidance</b> mixes in a
+  second pull at every step — toward a <span class="key">reference</span> you supply. The paper uses a simple convex
+  blend (their Equation 1): take the model's own update, and lerp it toward the reference by a strength α.</p>
+
+  <div class="eq">
+    <span class="lbl">shape channel</span>
+    x<sup>s</sup><sub>t</sub> = (1−α<sub>s</sub>)·( x<sup>s</sup><sub>t−Δ</sub> + Δ·v<sup>s</sup><sub>θ</sub> ) &nbsp;+&nbsp; α<sub>s</sub>·z<sup>s</sup><sub>ref</sub>(t)
+  </div>
+  <div class="eq">
+    <span class="lbl">pose channel</span>
+    x<sup>p</sup><sub>t</sub> = (1−α<sub>p</sub>)·( x<sup>p</sup><sub>t−Δ</sub> + Δ·v<sup>p</sup><sub>θ</sub> ) &nbsp;+&nbsp; α<sub>p</sub>·z<sup>p</sup><sub>ref</sub>(t)
+  </div>
+  <p style="font-size:14.5px" class="muted">with the reference "rails" being straight noise→target interpolants:
+  &nbsp;<code>z<sup>s</sup><sub>ref</sub>(t) = (1−t)ε<sup>s</sup> + t·x̄<sup>s</sup></code> (toward the
+  <b>frozen anchor shape</b> x̄<sup>s</sup>) &nbsp;and&nbsp;
+  <code>z<sup>p</sup><sub>ref</sub>(t) = (1−t)ε<sup>p</sup> + t·x<sup>p</sup><sub>k−1</sub></code> (toward the
+  <b>previous frame's pose</b> x<sup>p</sup><sub>k−1</sub>).</p>
+
+  <ul>
+    <li><span class="key">Shape</span>: crank α<sub>s</sub> <b>high</b> → the sample is dragged onto the fixed anchor
+    shape, so every frame reuses the same mesh. (This is the "lock the shape" knob — <code>--guidance_strength 1</code>
+    and <code>--fix_scale_to_init_frame</code>.)</li>
+    <li><span class="key">Pose</span>: set α<sub>p</sub> <b>moderate</b> → the pose is encouraged to stay near where
+    the object was last frame, but is still free to follow the actual motion. (<code>--pose_guidance_strength 0.5</code>.)</li>
+  </ul>
+
+  <div class="fig">
+    <svg viewBox="0 0 880 250" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,sans-serif">
+      <circle cx="80" cy="120" r="6" fill="#ff8fb1"/>
+      <text x="55" y="105" fill="#ff8fb1" font-size="12">ε</text>
+      <!-- model-only velocity -->
+      <line x1="80" y1="120" x2="200" y2="70" stroke="#6ea8fe" stroke-width="2.5" marker-end="url(#b)"/>
+      <text x="150" y="55" fill="#6ea8fe" font-size="11.5">v<tspan baseline-shift="sub" font-size="9">θ</tspan> (model says go here)</text>
+      <!-- reference pull -->
+      <line x1="80" y1="120" x2="200" y2="180" stroke="#c4a0ff" stroke-width="2.5" marker-end="url(#c)"/>
+      <text x="120" y="205" fill="#c4a0ff" font-size="11.5">z<tspan baseline-shift="sub" font-size="9">ref</tspan> (prev pose / anchor shape)</text>
+      <!-- blended -->
+      <line x1="80" y1="120" x2="210" y2="128" stroke="#7ef0c2" stroke-width="3.5" marker-end="url(#d)"/>
+      <text x="225" y="132" fill="#7ef0c2" font-size="12.5" font-weight="700">blended step (Eq. 1)</text>
+      <text x="225" y="150" fill="#9aa3b2" font-size="11">= (1−α)·model + α·reference</text>
+      <!-- alpha slider concept -->
+      <g transform="translate(500,40)">
+        <text x="0" y="0" fill="#cdd6e4" font-size="13" font-weight="700">α is the "trust the reference" dial</text>
+        <rect x="0" y="20" width="320" height="10" rx="5" fill="#1e2230" stroke="#2a2f3a"/>
+        <text x="0" y="55" fill="#6ea8fe" font-size="11">α=0 · pure model</text>
+        <text x="190" y="55" fill="#c4a0ff" font-size="11">α=1 · snap to reference</text>
+        <text x="0" y="95" fill="#9aa3b2" font-size="12">shape: α high  →  reuse anchor mesh</text>
+        <text x="0" y="115" fill="#9aa3b2" font-size="12">pose:  α mid   →  smooth but free to move</text>
+        <text x="0" y="135" fill="#ffcf6e" font-size="12">…and α<tspan baseline-shift="sub" font-size="9">p</tspan> is set adaptively (next section)</text>
+      </g>
+      <defs>
+        <marker id="b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#6ea8fe"/></marker>
+        <marker id="c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#c4a0ff"/></marker>
+        <marker id="d" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#7ef0c2"/></marker>
+      </defs>
+    </svg>
+    <div class="cap"><b>Figure 3.</b> Every Euler step is a tug-of-war: the frozen model's velocity
+    <code>v<sub>θ</sub></code> vs. a pull toward your reference <code>z<sub>ref</sub></code>, combined by α. No
+    weights change — you're only <i>routing</i> the same pretrained flow. That's why it needs <b>zero training</b>.</div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>4. Frame-to-frame: chaining the pose</h2>
+  <p>The reference for the pose channel is literally <b>the previous frame's answer</b>. So tracking is a chain:
+  solve frame <i>k</i> guided toward frame <i>k−1</i>, then frame <i>k+1</i> guided toward <i>k</i>, and so on. This
+  is what enforces temporal smoothness — the object can't teleport between frames.</p>
+
+  <div class="fig">
+    <svg viewBox="0 0 880 210" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,sans-serif">
+      <!-- anchor shape feeding all -->
+      <rect x="40" y="20" width="180" height="44" rx="8" fill="#12151c" stroke="#285043"/>
+      <text x="130" y="40" fill="#7ef0c2" font-size="12.5" text-anchor="middle" font-weight="700">🔒 anchor shape x̄ˢ</text>
+      <text x="130" y="56" fill="#9aa3b2" font-size="11" text-anchor="middle">fixed for whole video</text>
+
+      <g font-size="12" text-anchor="middle">
+        <!-- frame k-1 -->
+        <rect x="40" y="110" width="150" height="64" rx="10" fill="#161a22" stroke="#2a2f3a"/>
+        <text x="115" y="135" fill="#e7eaf0" font-weight="700">solve frame k−1</text>
+        <text x="115" y="155" fill="#9aa3b2" font-size="11">guided flow → poseₖ₋₁</text>
+        <!-- frame k -->
+        <rect x="250" y="110" width="150" height="64" rx="10" fill="#161a22" stroke="#2a2f3a"/>
+        <text x="325" y="135" fill="#e7eaf0" font-weight="700">solve frame k</text>
+        <text x="325" y="155" fill="#9aa3b2" font-size="11">guided flow → poseₖ</text>
+        <!-- frame k+1 -->
+        <rect x="460" y="110" width="150" height="64" rx="10" fill="#161a22" stroke="#2a2f3a"/>
+        <text x="535" y="135" fill="#e7eaf0" font-weight="700">solve frame k+1</text>
+        <text x="535" y="155" fill="#9aa3b2" font-size="11">guided flow → poseₖ₊₁</text>
+      </g>
+      <!-- chaining arrows -->
+      <g stroke="#c4a0ff" stroke-width="2.5" fill="none">
+        <line x1="190" y1="142" x2="248" y2="142" marker-end="url(#e)"/>
+        <line x1="400" y1="142" x2="458" y2="142" marker-end="url(#e)"/>
+      </g>
+      <text x="219" y="132" fill="#c4a0ff" font-size="10" text-anchor="middle">pose ref</text>
+      <text x="429" y="132" fill="#c4a0ff" font-size="10" text-anchor="middle">pose ref</text>
+      <!-- shape arrows down -->
+      <g stroke="#285043" stroke-width="1.5" fill="none" stroke-dasharray="4 3">
+        <line x1="115" y1="64" x2="115" y2="108" marker-end="url(#f)"/>
+        <line x1="325" y1="64" x2="325" y2="108" marker-end="url(#f)"/>
+        <line x1="535" y1="64" x2="535" y2="108" marker-end="url(#f)"/>
+      </g>
+      <!-- rotvel input -->
+      <rect x="650" y="110" width="190" height="64" rx="10" fill="#1c1a12" stroke="#3a341f"/>
+      <text x="745" y="133" fill="#ffcf6e" font-size="12" text-anchor="middle" font-weight="700">TAPIR 2D velocity</text>
+      <text x="745" y="152" fill="#9aa3b2" font-size="10.5" text-anchor="middle">motion_stats.json → sets αₚ</text>
+      <line x1="650" y1="142" x2="612" y2="142" stroke="#ffcf6e" stroke-width="2.5" marker-end="url(#g)" fill="none"/>
+      <defs>
+        <marker id="e" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#c4a0ff"/></marker>
+        <marker id="f" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#285043"/></marker>
+        <marker id="g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#ffcf6e"/></marker>
+      </defs>
+    </svg>
+    <div class="cap"><b>Figure 4.</b> The fixed anchor shape feeds every frame (dashed green); each frame's pose is
+    guided toward the previous frame's pose (purple chain). A side input — the object's 2D rotational speed from
+    TAPIR — modulates how strongly the chain pulls (next section). In the code this is
+    <code>--chain_poses --chain_on_diffusion</code>.</div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>5. Adaptive guidance: trust the past <i>less</i> when the object spins fast</h2>
+  <p>A fixed pose-guidance strength is a trap. If α<sub>p</sub> is too high, a fast-rotating object lags behind
+  ("over-rigidity"); too low, and a still object jitters or flips. The fix: make α<sub>p</sub> <b>depend on how fast
+  the object is actually rotating</b>, measured cheaply in 2D by TAPIR point tracks. The paper's rule:</p>
+
+  <div class="eq">α<sub>p</sub>(k) = max( 0.1, &nbsp; 0.7 − 0.09·|Δθ<sub>k</sub>| ) <span class="lbl">|Δθ<sub>k</sub>| = in-plane rotation magnitude (from ~20 tracked points)</span></div>
+
+  <div class="fig">
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,sans-serif">
+      <!-- axes -->
+      <line x1="60" y1="40" x2="60" y2="240" stroke="#2a2f3a" stroke-width="1.5"/>
+      <line x1="60" y1="240" x2="640" y2="240" stroke="#2a2f3a" stroke-width="1.5"/>
+      <text x="30" y="45" fill="#9aa3b2" font-size="11">αₚ</text>
+      <text x="30" y="70" fill="#9aa3b2" font-size="11">0.8</text>
+      <text x="30" y="217" fill="#9aa3b2" font-size="11">0.1</text>
+      <text x="560" y="262" fill="#9aa3b2" font-size="11">rotation speed |Δθ| →</text>
+      <!-- gridline floor -->
+      <line x1="60" y1="215" x2="640" y2="215" stroke="#3a341f" stroke-width="1" stroke-dasharray="4 4"/>
+      <text x="600" y="210" fill="#ffcf6e" font-size="10">floor 0.1</text>
+      <!-- curve: (60,65)->(338,215)->(640,215) -->
+      <polyline points="60,65 338,215 640,215" fill="none" stroke="#7ef0c2" stroke-width="3"/>
+      <circle cx="60" cy="65" r="4" fill="#7ef0c2"/>
+      <circle cx="338" cy="215" r="4" fill="#7ef0c2"/>
+      <!-- annotations -->
+      <g font-size="12">
+        <text x="80" y="95" fill="#7ef0c2">slow / still object →</text>
+        <text x="80" y="113" fill="#cdd6e4" font-weight="700">strong guidance (αₚ≈0.7)</text>
+        <text x="80" y="131" fill="#9aa3b2" font-size="11">stays locked, no jitter/flips</text>
+
+        <text x="380" y="150" fill="#ffcf6e">fast spin →</text>
+        <text x="380" y="168" fill="#cdd6e4" font-weight="700">weak guidance (αₚ→0.1)</text>
+        <text x="380" y="186" fill="#9aa3b2" font-size="11">free to follow real motion</text>
+      </g>
+    </svg>
+    <div class="cap"><b>Figure 5.</b> Adaptive pose-guidance schedule. When the object barely rotates, lean hard on the
+    previous pose (stable). When it spins, release the guidance so the tracker can keep up. The rotation magnitude
+    |Δθ| comes from <code>tapir_velocity_tracking.py</code>, which fits a rigid rotation to ~20 tracked points via
+    SVD and writes <code>motion_stats.json</code>. <span class="muted">(Exact constants 0.7 / 0.09 are from the
+    paper; the qualitative high-rotation→low-α rule is the point.)</span></div>
+  </div>
+
+  <div class="evidence">📂 <b>Verified in code:</b> <code>scripts/tapir_velocity_tracking.py</code> tracks the object
+  mask with BootsTAPIR and "estimates translation + rotation velocity via SVD rigid fitting," saving per-frame
+  <code>rotation_vel</code> to <code>motion_stats.json</code>. <code>run_pipeline.sh</code> then passes it straight in:
+  <code>track_object.py … --rotvel_json …/motion_stats.json</code>.</div>
+
+  <!-- ============================================================= -->
+  <h2>6. Many guesses → pick the best (without likelihoods)</h2>
+  <p>A generative model is stochastic — run it twice, get two slightly different poses. So per frame they draw
+  <b>25 candidate poses</b> and must choose. Computing each candidate's exact probability is far too slow, so they use
+  a fast geometric procedure instead:</p>
+
+  <div class="fig">
+    <svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,sans-serif">
+      <!-- panel 1: samples -->
+      <g transform="translate(20,30)">
+        <rect width="180" height="150" rx="10" fill="#12151c" stroke="#2a2f3a"/>
+        <text x="90" y="-8" fill="#cdd6e4" font-size="12" text-anchor="middle" font-weight="700">25 candidates</text>
+        <g fill="#6ea8fe">
+          <circle cx="55" cy="50" r="4"/><circle cx="65" cy="62" r="4"/><circle cx="50" cy="70" r="4"/><circle cx="72" cy="55" r="4"/><circle cx="60" cy="78" r="4"/>
+          <circle cx="130" cy="105" r="4"/><circle cx="120" cy="115" r="4"/><circle cx="138" cy="118" r="4"/>
+          <circle cx="100" cy="40" r="4" fill="#5a6477"/><circle cx="150" cy="60" r="4" fill="#5a6477"/>
+        </g>
+        <text x="90" y="140" fill="#9aa3b2" font-size="10" text-anchor="middle">scattered poses</text>
+      </g>
+      <text x="212" y="110" fill="#9aa3b2" font-size="22">→</text>
+      <!-- panel 2: cluster -->
+      <g transform="translate(240,30)">
+        <rect width="180" height="150" rx="10" fill="#12151c" stroke="#2a2f3a"/>
+        <text x="90" y="-8" fill="#cdd6e4" font-size="12" text-anchor="middle" font-weight="700">SE(3) cluster</text>
+        <ellipse cx="60" cy="63" rx="28" ry="26" fill="#6ea8fe22" stroke="#6ea8fe" stroke-dasharray="3 3"/>
+        <ellipse cx="128" cy="112" rx="20" ry="16" fill="#6ea8fe22" stroke="#6ea8fe" stroke-dasharray="3 3"/>
+        <g fill="#6ea8fe">
+          <circle cx="55" cy="50" r="4"/><circle cx="65" cy="62" r="4"/><circle cx="50" cy="70" r="4"/><circle cx="72" cy="55" r="4"/><circle cx="60" cy="78" r="4"/>
+          <circle cx="130" cy="105" r="4"/><circle cx="120" cy="115" r="4"/><circle cx="138" cy="118" r="4"/>
+        </g>
+        <circle cx="100" cy="40" r="4" fill="#5a6477"/><circle cx="150" cy="60" r="4" fill="#5a6477"/>
+        <text x="100" y="33" fill="#ff8fb1" font-size="9">drop singletons</text>
+      </g>
+      <text x="432" y="110" fill="#9aa3b2" font-size="22">→</text>
+      <!-- panel 3: IoU rank -->
+      <g transform="translate(460,30)">
+        <rect width="180" height="150" rx="10" fill="#12151c" stroke="#2a2f3a"/>
+        <text x="90" y="-8" fill="#cdd6e4" font-size="12" text-anchor="middle" font-weight="700">rank by mask IoU</text>
+        <!-- object mask -->
+        <ellipse cx="90" cy="80" rx="50" ry="34" fill="#7ef0c233" stroke="#7ef0c2" stroke-width="2"/>
+        <text x="90" y="40" fill="#7ef0c2" font-size="10" text-anchor="middle">SAM3 object mask</text>
+        <!-- rendered silhouette overlay -->
+        <ellipse cx="96" cy="84" rx="46" ry="30" fill="none" stroke="#ffcf6e" stroke-width="2" stroke-dasharray="4 3" transform="rotate(8 96 84)"/>
+        <text x="90" y="135" fill="#ffcf6e" font-size="10" text-anchor="middle">render each cluster, compare</text>
+      </g>
+      <text x="652" y="110" fill="#9aa3b2" font-size="22">→</text>
+      <!-- panel 4: winner -->
+      <g transform="translate(680,30)">
+        <rect width="180" height="150" rx="10" fill="#12151c" stroke="#285043"/>
+        <text x="90" y="-8" fill="#7ef0c2" font-size="12" text-anchor="middle" font-weight="700">winner</text>
+        <ellipse cx="90" cy="80" rx="48" ry="32" fill="#7ef0c233" stroke="#7ef0c2" stroke-width="2.5"/>
+        <text x="90" y="84" fill="#7ef0c2" font-size="11" text-anchor="middle" font-weight="700">best-IoU pose</text>
+        <text x="90" y="135" fill="#9aa3b2" font-size="10" text-anchor="middle">→ pose for this frame</text>
+      </g>
+    </svg>
+    <div class="cap"><b>Figure 6.</b> Per-frame selection: (1) sample 25 poses; (2) group them with a weighted
+    <b>SE(3) distance</b> <code>d = w<sub>t</sub>‖t<sub>i</sub>−t<sub>j</sub>‖ + w<sub>r</sub>·2·arccos|⟨q<sub>i</sub>,q<sub>j</sub>⟩|</code>
+    (translation + quaternion angle) and drop tiny clusters as noise; (3) render each surviving cluster's mesh and
+    score its silhouette against the real object mask by IoU; (4) keep the best. Cheap, and no probability evaluation.</div>
+  </div>
+
+  <div class="evidence">📂 <b>Verified in the run command</b> (<code>run_pipeline.sh</code>, stage 3):
+  <code>--num_pose_samples 25</code>, <code>--pose_selection cluster</code>, <code>--cluster_dist_thresh 0.3</code>,
+  <code>--cluster_min_size 3</code> (drop clusters &lt; 3), <code>--cluster_w_rot 1.5</code> (the w<sub>r</sub> in the
+  distance), <code>--scoring_metric render_iou</code> (the silhouette-IoU ranking). Matches the paper exactly.</div>
+
+  <!-- ============================================================= -->
+  <h2>7. The whole thing, as actually run</h2>
+  <p>Here is the literal command the pipeline issues per object — every concept above maps to a flag:</p>
+<pre><code>python track_object.py \
+  --init_frame  $n                # 🔒 anchor frame (shape fixed here)
+  --fix_scale_to_init_frame       #    lock object scale to the anchor
+  --guidance_strength 1           # α_s  — shape pulled onto anchor mesh
+  --pose_guidance_strength 0.5    # α_p  — base pose-guidance strength
+  --rotvel_json .../motion_stats.json   # adaptive α_p from TAPIR 2D rotation
+  --chain_poses --chain_on_diffusion    # frame k guided toward frame k-1
+  --euler_steps 25                # 25-step flow integration per frame
+  --num_pose_samples 25           # 25 stochastic candidates / frame
+  --pose_selection cluster        # SE(3) clustering ...
+  --cluster_w_rot 1.5  --cluster_min_size 3  --cluster_dist_thresh 0.3
+  --scoring_metric render_iou     # ... ranked by silhouette IoU vs mask
+  --post_optimize                 # final pose polish
+  --save_layout                   # write per-frame 6-DoF → layout.json</code></pre>
+
+  <div class="card">
+    <h3 style="margin-top:0">Why this answers your original question</h3>
+    <p>Every step here is <b>inference on a frozen pretrained model</b>. The "guidance," the chaining, the adaptive
+    α<sub>p</sub>, the 25-sample clustering — none of it has learnable weights or a loss. The large-scale training
+    already happened (Meta's SAM-3D); this work only <b>steers the sampler and post-selects</b>. That's exactly how
+    you get a temporally-consistent 6-DoF video tracker out of a single-image model <span class="key">without
+    training anything</span>.</p>
+  </div>
+
+  <div class="warnote">📝 <b>Evidence boundary:</b> the pipeline staging, the TAPIR velocity computation, and the full
+  <code>track_object.py</code> command line (with all the flags above) are verified from the repo
+  (<code>run_pipeline.sh</code>, <code>scripts/tapir_velocity_tracking.py</code>). The internal flow-update math
+  (Equation 1) and the exact adaptive-α constants are taken from the paper text — the
+  <code>modules/Fast-SAM3D/track_object.py</code> source is a git submodule that is not checked out in this clone, so
+  those equations are described, not read line-by-line.</div>
+
+  <div class="footer">
+    Companion to <code>do_as_i_do_analysis.html</code>. Figures are schematic (hand-drawn SVG), not renders from the
+    paper. Mechanism per arXiv 2606.19333 + the repo at <code>/home/user2/code/do-as-i-do</code>.
+  </div>
+
+</div>
+</body>
+</html>

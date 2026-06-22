@@ -1,0 +1,127 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spider"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy",
+  "torch",
+  "loguru",
+  "tyro",
+  "loop-rate-limiters",
+  "hydra-core",
+  "matplotlib",
+  "imageio[ffmpeg]",
+  "mediapy",
+  "opencv-python",
+  "mujoco==3.7.0",
+  "mujoco-warp==3.7.0.1",
+  "warp-lang==1.12.1",
+  "rerun-sdk==0.26.2",
+  "viser",
+  "ipdb",
+  # pymeshlab 2025+ wheels require glibc 2.35; pin to last 2024-compatible
+  # release to support older Linux hosts.
+  "pymeshlab<2025",
+  "open3d",
+  "ipykernel",
+  "huggingface_hub",
+  "gspread",
+  "google-auth",
+  "mink",
+]
+
+[project.scripts]
+spider-mjwp = "examples.run_mjwp:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+explicit = true
+
+[tool.uv]
+# Allow uv to fall through to a later index when the first index lacks a
+# usable version (e.g. internal mirrors that only stock a legacy
+# opencv-python==3.2.0.6 with no Python 3.12 wheels).
+index-strategy = "unsafe-best-match"
+
+[tool.uv.sources]
+warp-lang = { index = "nvidia" }
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["spider"]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.13.2",
+]
+# OakInk2 toolkit lives outside the resolver; install manually after
+# `uv sync` if you need the oakinkv2 dataset processor:
+#   uv pip install /path/to/OakInk2
+#
+# Optional 21-joint MANO skeleton in the viser viewer requires manotorch +
+# the gated MANO model files (mano.is.tue.mpg.de). manotorch's setup.py pins
+# an unbuildable opencv-python so it cannot live in the uv resolver; install
+# manually after `uv sync --extra oakinkv2`:
+#
+#   uv pip install pip
+#   uv pip install --no-build-isolation \
+#       'chumpy @ git+https://github.com/mattloper/chumpy@9b045ff5d6588a24a0bab52c83f032e2ba433e17'
+#   uv pip install --no-deps git+https://github.com/lixiny/manotorch.git
+#
+# Then place MANO_LEFT.pkl + MANO_RIGHT.pkl under <root>/models/ and pass
+# --mano-assets-root=<root> to the processor.
+
+[tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# Assume Python 3.12+
+target-version = "py312"
+
+[tool.ruff.lint]
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+# Plus Google style conventions
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # Pyflakes
+  "I",    # isort
+  "N",    # pep8-naming
+  "D",    # pydocstyle (Google style docstrings)
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "SIM",  # flake8-simplify
+]
+
+ignore = [
+  "E501",   # Line too long (handled by formatter)
+  "D100",   # Missing docstring in public module
+  "D104",   # Missing docstring in public package
+  "D107",   # Missing docstring in `__init__`
+]
+
+[tool.ruff.format]
+# Use Google style formatting
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.pydocstyle]
+# Use Google-style docstrings
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["spider"]

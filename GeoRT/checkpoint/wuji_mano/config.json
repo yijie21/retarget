@@ -1,0 +1,155 @@
+{
+    "name": "wuji",
+    "urdf_path": "./assets/wuji/urdf/right_nocollision.urdf",
+    "base_link": "right_palm_link",
+    "joint_order": [
+        "right_finger1_joint1",
+        "right_finger1_joint2",
+        "right_finger1_joint3",
+        "right_finger1_joint4",
+        "right_finger2_joint1",
+        "right_finger2_joint2",
+        "right_finger2_joint3",
+        "right_finger2_joint4",
+        "right_finger3_joint1",
+        "right_finger3_joint2",
+        "right_finger3_joint3",
+        "right_finger3_joint4",
+        "right_finger4_joint1",
+        "right_finger4_joint2",
+        "right_finger4_joint3",
+        "right_finger4_joint4",
+        "right_finger5_joint1",
+        "right_finger5_joint2",
+        "right_finger5_joint3",
+        "right_finger5_joint4"
+    ],
+    "fingertip_link": [
+        {
+            "name": "thumb",
+            "link": "right_finger1_tip_link",
+            "joint": [
+                "right_finger1_joint1",
+                "right_finger1_joint2",
+                "right_finger1_joint3",
+                "right_finger1_joint4"
+            ],
+            "center_offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "human_hand_id": 4
+        },
+        {
+            "name": "index",
+            "link": "right_finger2_tip_link",
+            "joint": [
+                "right_finger2_joint1",
+                "right_finger2_joint2",
+                "right_finger2_joint3",
+                "right_finger2_joint4"
+            ],
+            "center_offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "human_hand_id": 8
+        },
+        {
+            "name": "middle",
+            "link": "right_finger3_tip_link",
+            "joint": [
+                "right_finger3_joint1",
+                "right_finger3_joint2",
+                "right_finger3_joint3",
+                "right_finger3_joint4"
+            ],
+            "center_offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "human_hand_id": 12
+        },
+        {
+            "name": "ring",
+            "link": "right_finger4_tip_link",
+            "joint": [
+                "right_finger4_joint1",
+                "right_finger4_joint2",
+                "right_finger4_joint3",
+                "right_finger4_joint4"
+            ],
+            "center_offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "human_hand_id": 16
+        },
+        {
+            "name": "pinky",
+            "link": "right_finger5_tip_link",
+            "joint": [
+                "right_finger5_joint1",
+                "right_finger5_joint2",
+                "right_finger5_joint3",
+                "right_finger5_joint4"
+            ],
+            "center_offset": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "human_hand_id": 20
+        }
+    ],
+    "joint": {
+        "lower": [
+            0.04749999940395355,
+            -0.1386999934911728,
+            -0.4641999900341034,
+            -0.4699000120162964,
+            -0.15850000083446503,
+            -0.3700000047683716,
+            -0.47769999504089355,
+            -0.4683000147342682,
+            -0.16439999639987946,
+            -0.3700000047683716,
+            -0.4738999903202057,
+            -0.4684000015258789,
+            -0.15539999306201935,
+            -0.3700000047683716,
+            -0.476500004529953,
+            -0.47769999504089355,
+            -0.16259999573230743,
+            -0.3700000047683716,
+            -0.47679999470710754,
+            -0.4683000147342682
+        ],
+        "upper": [
+            1.6032999753952026,
+            0.9323999881744385,
+            1.5622999668121338,
+            1.5568000078201294,
+            1.5604000091552734,
+            0.3700000047683716,
+            1.5484999418258667,
+            1.5752999782562256,
+            1.5515999794006348,
+            0.3700000047683716,
+            1.551200032234192,
+            1.5744999647140503,
+            1.558500051498413,
+            0.3700000047683716,
+            1.548699975013733,
+            1.5634000301361084,
+            1.558500051498413,
+            0.3700000047683716,
+            1.5490000247955322,
+            1.5735000371932983
+        ]
+    }
+}

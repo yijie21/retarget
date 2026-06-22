@@ -1,0 +1,11 @@
+# Proprietary Sharpa Wave SDK — drop in locally (see robot_replay/config.example.yaml)
+robot_replay/Sharpa/
+
+# Machine-specific config: real robot IPs / hand serials
+robot_replay/config.yaml
+
+# Generated artifacts
+**/__pycache__/
+*.pyc
+*.npz
+mujoco_replay/scene.xml

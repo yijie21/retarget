@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoRT, Explained Simply</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --card2:#1e2230; --ink:#e7eaf0; --mut:#9aa3b2;
+    --accent:#6ea8fe; --accent2:#7ef0c2; --warn:#ffcf6e; --pink:#ff8fb1; --line:#2a2f3a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:920px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:38px;line-height:1.15;margin:0 0 8px}
+  h1 .sub{display:block;font-size:17px;color:var(--mut);font-weight:400;margin-top:10px}
+  h2{font-size:25px;margin:54px 0 14px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:19px;margin:26px 0 8px;color:var(--accent2)}
+  p{margin:12px 0}
+  a{color:var(--accent)}
+  .tag{display:inline-block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:3px 10px;margin-right:6px}
+  .lead{font-size:18px;color:#cfd6e2}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+  .pill{font-size:13px;color:var(--mut)}
+  code,.mono{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:13.5px}
+  code{background:#0b0d12;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#cfe2ff}
+  pre{background:#0b0d12;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow:auto;margin:10px 0}
+  pre code{background:none;border:none;padding:0;color:#d7e2f4}
+  .flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:18px 0}
+  .step{flex:1;min-width:150px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .step .n{font-size:12px;color:var(--accent);font-weight:700}
+  .step b{display:block;margin:4px 0 6px;font-size:15px}
+  .step span{font-size:13.5px;color:var(--mut)}
+  .arrow{align-self:center;color:var(--mut);font-size:22px}
+  .loss{border-left:3px solid var(--accent);padding-left:16px;margin:22px 0}
+  .loss .w{float:right;font-size:12px;color:var(--mut);background:#0b0d12;border:1px solid var(--line);
+    border-radius:6px;padding:2px 8px}
+  .loss h3{margin-top:0}
+  .key{color:var(--accent2);font-weight:600}
+  .muted{color:var(--mut)}
+  .note{background:#1a1c12;border:1px solid #3a3a1f;border-radius:10px;padding:12px 16px;color:#e9e3bf;font-size:14.5px}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+  .emoji{font-size:18px}
+  .legend{font-size:13px;color:var(--mut);margin-top:6px}
+  svg{max-width:100%;height:auto}
+  .footer{margin-top:60px;color:var(--mut);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">Paper walkthrough</span>
+  <span class="tag">arXiv 2503.07541</span>
+  <h1>GeoRT — Geometric Retargeting
+    <span class="sub">How a human hand's motion is turned into robot-hand joint commands, in plain words.
+    Based on the paper <i>“Geometric Retargeting: A Principled, Ultrafast Neural Hand Retargeting Algorithm”</i>
+    and the code in this repo (<code>trainer.py</code>, <code>model.py</code>).</span>
+  </h1>
+
+  <p class="lead">You found the paper light on method detail — that's because the real method lives in
+  <b>five geometric loss functions</b> and <b>two small neural networks</b>. This page explains exactly
+  what each one does and why.</p>
+
+  <!-- ============================================================= -->
+  <h2>1. The problem, in one breath</h2>
+  <div class="card">
+    <p>You move <b>your</b> hand. A robot hand (Allegro, Wuji, …) should copy the <i>intent</i> of that motion
+    in real time. But the robot's fingers have different lengths, different joints, and a different reachable
+    space than yours. <b>Retargeting</b> = the function that converts <span class="key">human fingertip positions</span>
+    → <span class="key">robot joint angles</span>, frame by frame, so the robot "does what you mean."</p>
+    <p>The hard part: there is no ground-truth answer. Nobody can label "this human pose = exactly this robot pose."
+    So GeoRT learns the mapping <b>unsupervised</b>, guided only by geometric common sense about what a good
+    mapping should preserve.</p>
+  </div>
+
+  <h3>What other methods do (and GeoRT's twist)</h3>
+  <div class="grid">
+    <div class="card">
+      <p class="pill">⏳ Optimization-based (e.g. DexPilot)</p>
+      <p>Solve a little optimization problem <b>every single frame</b> to find joint angles. Accurate but slow,
+      and needs hand-tuned weights.</p>
+    </div>
+    <div class="card">
+      <p class="pill">⚡ GeoRT</p>
+      <p>Train a tiny network <b>once</b>. At runtime it's a single forward pass → <b>~1&nbsp;kHz</b> (1000 retargets/sec).
+      No per-frame optimization, far fewer knobs, no manual hand-pose labels.</p>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>2. The two networks</h2>
+  <p>GeoRT splits the hand finger-by-finger. Each finger gets its own pair of small MLPs
+  (<code>model.py</code>). They are inverses of each other:</p>
+
+  <div class="flow">
+    <div class="step">
+      <div class="n">IK MODEL — the thing we actually want</div>
+      <b>fingertip → joints</b>
+      <span>Input: a 3D fingertip position. Output: that finger's robot joint angles. This is the
+      retargeter you deploy. (<code>IKModel</code>)</span>
+    </div>
+    <div class="arrow">↻</div>
+    <div class="step">
+      <div class="n">FK MODEL — a helper / “simulator”</div>
+      <b>joints → fingertip</b>
+      <span>A learned, <i>differentiable</i> copy of the robot's real forward kinematics: given joint angles,
+      where does the robot fingertip end up? (<code>FKModel</code>)</span>
+    </div>
+  </div>
+
+  <h3>Why two networks instead of one?</h3>
+  <div class="card">
+    <p>To train the IK model we need to measure <i>“if the robot uses these joints, where does its fingertip
+    actually go?”</i> — and we need that measurement to be <b>differentiable</b> so gradients can flow back into
+    the IK network. The robot's true forward kinematics is a non-differentiable simulator (SAPIEN). So GeoRT first
+    trains a neural network to <b>imitate</b> the real FK:</p>
+    <ul>
+      <li>Sample 100k random robot joint configs, run the <b>real</b> simulator to get true fingertip positions
+      (<code>generate_robot_kinematics_dataset</code>).</li>
+      <li>Train <code>FKModel</code> to reproduce them (plain MSE). This takes ~5&nbsp;min and happens
+      <b>once per robot hand</b>, then is frozen.</li>
+    </ul>
+    <p>Now the training loop can do <span class="mono">point → IK → joints → FK → point'</span> entirely with
+    differentiable neural nets. That round-trip is the backbone of every loss below.</p>
+  </div>
+
+  <div class="card">
+    <p class="pill">The training round-trip (from <code>trainer.py</code>)</p>
+<pre><code>point          = a human fingertip position        # [B, 5 fingers, 3]
+joint          = ik_model(point)                   # robot joint angles
+embedded_point = fk_model(joint)                   # where robot fingertip lands</code></pre>
+    <p class="legend">Everything GeoRT learns is just: “shape the IK network so that <code>embedded_point</code>
+    behaves the way a good retargeting should.” The five rules for “behaves well” are the loss functions.</p>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>3. The training data: workspaces, not pose pairs</h2>
+  <div class="card">
+    <p>GeoRT never sees matched (human-pose, robot-pose) pairs. Instead it uses two <b>clouds of points</b>:</p>
+    <div class="grid">
+      <div>
+        <p><span class="key">Human cloud</span> — record yourself for a minute (or sample the MANO model):
+        stretch each finger to its limits and do pinches. Keep only the <b>5 fingertips</b>. This traces out the
+        <i>region of space your fingertips can reach</i>.</p>
+      </div>
+      <div>
+        <p><span class="key">Robot cloud</span> — randomly wiggle the robot in simulation and record where its
+        5 fingertips land. This traces out the <i>robot's reachable region</i>.</p>
+      </div>
+    </div>
+    <p>Retargeting then becomes a <b>geometry problem</b>: find a mapping that warps the human's reachable region
+    onto the robot's reachable region while preserving the <i>structure</i> of motion. That's literally what
+    "Geometric Retargeting" means.</p>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>4. The five geometric rules (loss functions)</h2>
+  <p>This is the heart of the paper. Each rule is one term in the training loss
+  (<code>trainer.py</code>, lines ~276–335). Default weights shown on the right.</p>
+
+  <div class="loss">
+    <span class="w">weight 80 — the dominant term</span>
+    <h3>① Chamfer / Workspace coverage <span class="muted">“use your whole range”</span></h3>
+    <p>Push the cloud of <i>robot</i> fingertip positions (produced by mapping the human cloud) to <b>cover the
+    robot's true reachable cloud</b>. Chamfer distance just measures “how well do two point clouds overlap.”</p>
+    <p class="muted"><b>Why:</b> guarantees the mapping uses the robot's <b>entire</b> workspace — when you fully
+    open or fully close your hand, the robot does too, instead of cramming everything into a tiny middle region.
+    This is the "C-space coverage" property from the abstract.</p>
+  </div>
+
+  <div class="loss">
+    <span class="w">weight 1 (baseline)</span>
+    <h3>② Direction / Motion fidelity <span class="muted">“move the same way I do”</span></h3>
+    <p>Nudge a human fingertip a tiny bit in some random direction. The robot fingertip should move in the
+    <b>same direction</b>. The loss maximizes the cosine similarity between “human nudge” and “robot response”
+    (it's written as a negative dot product of the two unit vectors).</p>
+    <p class="muted"><b>Why:</b> if you move your finger up-and-left, the robot finger moves up-and-left.
+    This preserves the <i>feel</i> and intuitiveness of teleoperation — the single most important property for a
+    human operator.</p>
+  </div>
+
+  <div class="loss">
+    <span class="w">weight 0.1</span>
+    <h3>③ Curvature / Flatness <span class="muted">“respond smoothly, no jerks”</span></h3>
+    <p>Take a point and its two neighbors a hair away on each side; the robot's response should be (almost) a
+    straight line through them — i.e. the second derivative ≈ 0. Implemented as
+    <code>(f(x+δ) + f(x−δ) − 2·f(x))²</code>.</p>
+    <p class="muted"><b>Why:</b> makes the mapping locally <b>linear and uniform</b>, so equal hand motions give
+    equal robot motions everywhere. No regions where the robot suddenly over-reacts or freezes. (The "high flatness /
+    uniform response" property.)</p>
+  </div>
+
+  <div class="loss">
+    <span class="w">weight 1</span>
+    <h3>④ Pinch correspondence <span class="muted">“if I pinch, the robot pinches”</span></h3>
+    <p>Whenever <b>two human fingertips touch</b> (distance &lt; 1.5&nbsp;cm), force the corresponding two
+    <b>robot</b> fingertips to also meet. Checked for every finger pair (in practice thumb-to-other matters most).</p>
+    <p class="muted"><b>Why:</b> pinching/grasping is where retargeting usually breaks — the robot "almost" touches
+    and drops the object. This term makes contact line up precisely, so grasps transfer.</p>
+  </div>
+
+  <div class="loss">
+    <span class="w">weight 0 — present but off in this repo</span>
+    <h3>⑤ Self-collision avoidance <span class="muted">“don't crash your own fingers”</span></h3>
+    <p>A learned classifier flags joint configurations where the robot's fingers would collide, and the loss
+    steers the IK network away from them. In the released code this term is stubbed out
+    (<code>w_collision = 0</code>), but it's part of the principled formulation.</p>
+  </div>
+
+  <h3>The whole objective is just their weighted sum</h3>
+<pre><code>loss = direction_loss
+     + 80.0 * chamfer_loss      # cover the workspace
+     +  0.1 * curvature_loss    # stay smooth/flat
+     +  1.0 * pinch_loss        # pinches line up
+     +  0.0 * collision_loss    # (disabled here)</code></pre>
+  <p class="note">⚖️ <b>This is the "principled, fewer hyperparameters" claim:</b> the entire behavior of the
+  retargeter is governed by these ~4 interpretable weights, each tied to a concrete geometric property — versus
+  optimization-based methods that juggle many per-frame, hard-to-interpret cost terms.</p>
+
+  <!-- ============================================================= -->
+  <h2>5. Putting it together</h2>
+
+  <div class="flow">
+    <div class="step"><div class="n">ONCE PER HAND</div><b>Train neural FK</b>
+      <span>Random robot poses → real simulator → fit <code>FKModel</code>. ~5 min, then frozen.</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">PER HUMAN</div><b>Collect clouds</b>
+      <span>Record human fingertips; sample robot fingertips. Two point clouds.</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">1–2 MIN</div><b>Train IK</b>
+      <span>Minimize the 5 geometric losses over the round-trip. Output: the retargeter.</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">RUNTIME</div><b>Deploy @ 1 kHz</b>
+      <span>One forward pass: human fingertips → robot joints. No optimization.</span></div>
+  </div>
+
+  <div class="card">
+    <p class="pill">Deploying it is three lines (from the README)</p>
+<pre><code>import geort
+model = geort.load_model('geort_1')
+qpos  = model.forward(mocap.get())   # human keypoints in → robot joints out</code></pre>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>6. Why each buzzword in the title is true</h2>
+  <table>
+    <tr><th>Claim</th><th>Where it comes from</th></tr>
+    <tr><td><b>Geometric</b></td><td>Every loss is a statement about shapes & directions in 3D space
+      (cloud overlap, motion direction, flatness, contact), not about labeled examples.</td></tr>
+    <tr><td><b>Principled</b></td><td>~4 interpretable weights, each mapped to one concrete property
+      (coverage, fidelity, smoothness, pinch, collision). Unsupervised — no manual hand-pair annotation.</td></tr>
+    <tr><td><b>Ultrafast</b></td><td>Inference is a single MLP pass per finger → ~1 kHz. No test-time optimization
+      loop, unlike DexPilot-style methods.</td></tr>
+    <tr><td><b>Neural</b></td><td>Two tiny MLPs per finger (IK + the FK surrogate that makes training
+      differentiable).</td></tr>
+  </table>
+
+  <!-- ============================================================= -->
+  <h2>7. The one-sentence summary</h2>
+  <div class="card">
+    <p class="lead">GeoRT trains a tiny per-finger network to map your fingertips to robot joints by enforcing
+    five geometric common-sense rules — <span class="key">cover the robot's full range</span>,
+    <span class="key">move in the same direction you do</span>, <span class="key">respond smoothly</span>,
+    <span class="key">match your pinches</span>, and <span class="key">avoid self-collision</span> — using a
+    learned differentiable forward-kinematics model so it needs no labeled data, and then runs at 1&nbsp;kHz with
+    no per-frame optimization.</p>
+  </div>
+
+  <div class="footer">
+    Generated from a reading of the paper (arXiv 2503.07541) and the repository source
+    (<code>geort/trainer.py</code>, <code>geort/model.py</code>, <code>geort/loss.py</code>, README).
+    The method explanation is grounded in the actual loss code, which is the most precise description of the algorithm.
+  </div>
+
+</div>
+</body>
+</html>

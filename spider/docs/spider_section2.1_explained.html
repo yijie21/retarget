@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPIDER &mdash; Section 2.1 Problem Formulation, Explained</title>
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['\\(', '\\)'], ['$', '$']],
+      displayMath: [['\\[', '\\]'], ['$$', '$$']],
+      tags: 'none'
+    },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a2e;
+    --muted: #555;
+    --accent: #b31b1b;
+    --accent2: #2563eb;
+    --box: #f5f7fa;
+    --border: #e2e8f0;
+    --code-bg: #f0f2f5;
+    --green: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14151a; --fg: #e6e6e6; --muted: #a0a0a0; --accent: #ff6b6b;
+      --accent2: #6ea8ff; --box: #1d1f27; --border: #2c2f3a; --code-bg: #22242c;
+      --green: #4ade80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65; max-width: 880px; margin: 0 auto; padding: 2.5rem 1.5rem 6rem;
+    font-size: 17px;
+  }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.4rem; margin-top: 2.6rem; border-bottom: 2px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.8rem; color: var(--accent2); }
+  .subtitle { color: var(--muted); font-size: 1rem; margin-top: 0; }
+  .lead {
+    background: var(--box); border-left: 4px solid var(--accent2);
+    padding: 0.9rem 1.2rem; border-radius: 6px; margin: 1.5rem 0;
+  }
+  .eqbox {
+    background: var(--box); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.4rem 1rem; margin: 1.3rem 0; overflow-x: auto;
+  }
+  .eqlabel { color: var(--muted); font-size: 0.85rem; font-style: italic; margin-top: -0.3rem; }
+  code {
+    background: var(--code-bg); padding: 0.12em 0.4em; border-radius: 4px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg); padding: 1rem; border-radius: 8px; overflow-x: auto;
+    border: 1px solid var(--border); font-size: 0.85em; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: 0.95rem; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.8rem; text-align: left; }
+  th { background: var(--box); }
+  .term { font-weight: 600; color: var(--accent); }
+  .green { color: var(--green); font-weight: 600; }
+  .note {
+    border-left: 3px solid var(--accent); background: var(--box);
+    padding: 0.7rem 1rem; border-radius: 0 6px 6px 0; margin: 1.2rem 0; font-size: 0.96rem;
+  }
+  .english {
+    border: 1px dashed var(--accent2); border-radius: 8px; padding: 1rem 1.2rem;
+    margin: 1.4rem 0; background: var(--box);
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+  a { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<h1>SPIDER &mdash; The Method (Sections 2.1&ndash;2.3), Explained</h1>
+<p class="subtitle">Problem formulation, sampling-based MPC, and curriculum virtual contact guidance &mdash;
+every equation explained term by term, with the matching code from this repo.
+<a href="https://arxiv.org/abs/2511.09484">arXiv:2511.09484</a></p>
+
+<div class="lead">
+<strong>Your intuition is correct:</strong> the whole thing just says
+&ldquo;minimize the distance between the robot's state and the human trajectory.&rdquo;
+The formalism only adds two refinements: (1) the &ldquo;distance&rdquo; is a <em>per&#8209;DOF weighted</em>
+sum so different body parts matter differently, and (2) a <em>physics constraint</em> forces every
+state to be physically reachable rather than just copied.
+</div>
+
+<h2>The objective (Eq. 1)</h2>
+
+<div class="eqbox">
+\[
+\min_{u_{0:T-1}}\; J(u_{0:T-1}) \;=\;
+\underbrace{\lVert x_T - x_T^{\text{ref}}\rVert^2_{Q_T}}_{\text{terminal term}}
+\;+\;
+\sum_{t=0}^{T-1}\Big(
+\underbrace{\lVert x_{t+1} - x_{t+1}^{\text{ref}}\rVert^2_{Q_t}}_{\text{tracking term}}
+\;+\;
+\underbrace{\lVert u_t \rVert^2_{R_t}}_{\text{control term}}
+\Big)
+\]
+</div>
+<p class="eqlabel">Eq. 1a &mdash; the cost to minimize</p>
+
+<div class="eqbox">
+\[
+\text{subject to}\quad
+x_{t+1} = f(x_t, u_t, t), \quad \forall t \in \{0,\dots,T-1\}
+\]
+</div>
+<p class="eqlabel">Eq. 1b &mdash; dynamics constraint (the simulator)</p>
+
+<div class="eqbox">
+\[
+x_{0:T} \in \mathcal{X}, \qquad u_{0:T-1} \in \mathcal{U}
+\]
+</div>
+<p class="eqlabel">Eq. 1c &mdash; feasibility constraints (joint / actuator limits)</p>
+
+<h2>What every symbol means</h2>
+
+<table>
+<tr><th>Symbol</th><th>Meaning</th><th>In the code</th></tr>
+<tr><td>\(u_{0:T-1}\)</td><td>The <span class="term">action sequence</span> \(u_0,\dots,u_{T-1}\) &mdash; the <em>only</em> thing the optimizer chooses (actuator targets per step).</td><td><code>ctrls</code>, shape <code>(horizon_steps, nu)</code></td></tr>
+<tr><td>\(x_t\)</td><td>The robot's <span class="term">state</span> at time \(t\): positions and velocities, \(x_t=\{q_t,\dot q_t\}\).</td><td><code>qpos</code>, <code>qvel</code> from the sim</td></tr>
+<tr><td>\(x_t^{\text{ref}}\)</td><td>The <span class="term">reference</span> (human-derived) state at time \(t\) &mdash; output of the IK stage.</td><td><code>qpos_ref</code>, <code>qvel_ref</code></td></tr>
+<tr><td>\(T\)</td><td>Horizon length (number of steps).</td><td><code>horizon_steps</code></td></tr>
+<tr><td>\(Q_t,\,Q_T\)</td><td>Diagonal <span class="term">weight matrices</span> on the state error (per-DOF importance).</td><td>the <code>*_rew_scale</code> weights</td></tr>
+<tr><td>\(R_t\)</td><td>Diagonal weight on control effort (regularization).</td><td>noise schedule / smoothness</td></tr>
+<tr><td>\(f\)</td><td>The <span class="term">physics simulator</span> &mdash; maps state+action to next state.</td><td>MuJoCo-Warp <code>step</code></td></tr>
+<tr><td>\(\mathcal{X},\mathcal{U}\)</td><td>Valid state space and action space (limits).</td><td>joint/torque limits</td></tr>
+</table>
+
+<h3>The reference state decomposes into robot + object</h3>
+<div class="eqbox">
+\[
+x_t^{\text{ref}} = \{q_t^{\text{ref}}, \dot q_t^{\text{ref}}\}, \qquad
+q_t^{\text{ref}} = \{\, q_t^{\text{ref,robot}},\; q_t^{\text{ref,object}} \,\}
+\]
+\[
+q_t^{\text{ref,joint}} \in \mathbb{R}^{n_u}, \qquad
+T_t^{\text{ref,base}} \in SE(3), \qquad
+q_t^{\text{ref,object}} \in SE(3)
+\]
+</div>
+<p>So the reference is the human's <em>joint angles</em>, the <em>base/wrist pose</em> (in \(SE(3)\), i.e. position + 3D rotation), and the <em>object pose</em> (also \(SE(3)\)).</p>
+
+<h2>The three terms, in plain English</h2>
+
+<h3>1. Tracking term &mdash; \(\sum_t \lVert x_{t+1}-x_{t+1}^{\text{ref}}\rVert^2_{Q_t}\)</h3>
+<p>&ldquo;At <em>every</em> timestep, stay close to the human trajectory.&rdquo; This is the bulk of the cost.</p>
+
+<h3>2. Terminal term &mdash; \(\lVert x_T - x_T^{\text{ref}}\rVert^2_{Q_T}\)</h3>
+<p>&ldquo;And <em>especially</em> nail the final state.&rdquo; Same distance, applied to the last step, usually weighted more strongly.</p>
+
+<h3>3. Control term &mdash; \(\lVert u_t\rVert^2_{R_t}\)</h3>
+<p>&ldquo;Don't use wild or expensive actions.&rdquo; A regularizer encouraging smooth, low-effort motion.</p>
+
+<h2>The notation that usually trips people up: \(\lVert v\rVert^2_Q\)</h2>
+
+<div class="note">
+A weighted norm is just a <strong>weighted sum of squares</strong>. For a diagonal \(Q\):
+</div>
+
+<div class="eqbox">
+\[
+\lVert v\rVert^2_Q \;=\; v^\top Q\, v \;=\; \sum_i Q_{ii}\, v_i^2
+\]
+</div>
+
+<p>It is <em>not</em> a plain Euclidean distance &mdash; each coordinate \(v_i\) is scaled by its own weight \(Q_{ii}\)
+before summing. Here \(Q_t=\operatorname{diag}(\{q_{\text{robot}},q_{\text{object}}\})\) means
+&ldquo;weight robot DOFs by these numbers, object DOFs by those.&rdquo; That diagonal <em>is</em> the
+per-DOF weight vector in the code:</p>
+
+<pre><code>delta_qpos = qpos_diff * qpos_weight              # element-wise weighting  &larr; this is Q
+qpos_dist  = torch.norm(delta_qpos, p=2, dim=1)   # then the L2 norm
+qpos_rew   = -qpos_dist                            # cost = -reward</code></pre>
+
+<p>And the weights come straight from the config:</p>
+
+<table>
+<tr><th>DOF group</th><th>weight (default)</th><th>paper symbol</th></tr>
+<tr><td>base position</td><td><code>base_pos_rew_scale</code> = 1.0</td><td>part of \(q_{\text{robot}}\)</td></tr>
+<tr><td>base rotation</td><td><code>base_rot_rew_scale</code> = 0.3</td><td>part of \(q_{\text{robot}}\)</td></tr>
+<tr><td>finger joints</td><td><code>joint_rew_scale</code> = 0.003</td><td>part of \(q_{\text{robot}}\)</td></tr>
+<tr><td>object position</td><td><code>pos_rew_scale</code> = 1.0</td><td>\(q_{\text{object}}\)</td></tr>
+<tr><td>object rotation</td><td><code>rot_rew_scale</code> = 0.3</td><td>\(q_{\text{object}}\)</td></tr>
+<tr><td>velocity</td><td><code>vel_rew_scale</code> = 0.0001</td><td>velocity part of \(Q\)</td></tr>
+</table>
+
+<p>The tiny <code>0.003</code> on finger joints vs. <code>1.0</code> on object position is exactly the \(Q\) matrix
+saying: <em>&ldquo;I care far more about the object ending up in the right place than about each finger joint
+matching the human precisely&rdquo;</em> &mdash; sensible given the embodiment gap.</p>
+
+<div class="note">
+<strong>Rotation detail:</strong> for rotation DOFs the &ldquo;\(x-x^{\text{ref}}\)&rdquo; is <em>not</em> plain
+subtraction. Because base and object poses live in \(SE(3)\), the code uses <code>quat_sub</code>
+(the geodesic difference on the rotation manifold \(SO(3)\)) instead of subtracting numbers.
+</div>
+
+<h2>The constraint that makes it &ldquo;physics-based&rdquo;</h2>
+
+<div class="eqbox">
+\[
+x_{t+1} = f(x_t, u_t, t)
+\]
+</div>
+
+<p>This single line is what separates SPIDER from plain kinematic retargeting. \(f\) is the
+<span class="green">physics simulator</span>. It says: you don't get to <em>place</em> the robot wherever
+minimizes the distance &mdash; you only pick actions \(u_t\), and the next state is <em>whatever physics
+produces</em>. If the fingers don't actually grip the object, gravity drops it, \(x_{t+1}\) diverges from
+\(x_{t+1}^{\text{ref}}\), and the cost rises. <strong>Dynamic feasibility is enforced by the constraint,
+not by the cost.</strong></p>
+
+<div class="english">
+<strong>The whole formula in one sentence:</strong><br>
+Choose the action sequence that keeps the <em>physically-simulated</em> robot trajectory as close as
+possible (in a per-DOF weighted sense, caring most about object pose and the final state) to the human
+reference, while obeying physics and actuator limits.
+</div>
+
+<h2>Section 2.2 &mdash; How it's actually solved: sampling-based MPC</h2>
+
+<p>There's no closed-form solution &mdash; \(f\) is a non-differentiable, contact-rich simulator, so you
+can't take gradients of \(J\). SPIDER instead solves Eq.&nbsp;1 by <strong>sampling</strong>: try many
+random control sequences, simulate them all, and move toward the good ones. This is the MPPI / DIAL-MPC
+family.</p>
+
+<h3>The update rule (Eq. 2)</h3>
+
+<div class="eqbox">
+\[
+U^{i+1} \;=\; U^{i} \;+\;
+\frac{\displaystyle\sum_{j=1}^{N_W} \exp\!\big(-J(U^{i}+[W]_j)/\lambda\big)\,[W]_j}
+     {\displaystyle\sum_{j=1}^{N_W} \exp\!\big(-J(U^{i}+[W]_j)/\lambda\big)}
+\]
+</div>
+<p class="eqlabel">Eq. 2 &mdash; softmax-weighted control update (one optimization iteration)</p>
+
+<p>Read it as a <strong>three-step loop</strong>, repeated for iterations \(i=0,1,2,\dots\):</p>
+
+<table>
+<tr><th>Symbol</th><th>Meaning</th><th>In the code</th></tr>
+<tr><td>\(U^i\)</td><td>The current best-guess control sequence at iteration \(i\) (the whole horizon).</td><td><code>ctrls</code></td></tr>
+<tr><td>\([W]_j\)</td><td>The \(j\)-th random <span class="term">noise perturbation</span> added to \(U^i\), drawn \([W]_j \sim \mathcal{N}(0,\Sigma)\).</td><td><code>delta_ctrl_samples</code></td></tr>
+<tr><td>\(N_W\)</td><td>Number of sampled particles (candidate trajectories).</td><td><code>num_samples</code> = 2048</td></tr>
+<tr><td>\(J(\cdot)\)</td><td>Trajectory cost from Eq.&nbsp;1a &mdash; computed by rolling each candidate through the simulator.</td><td><code>-rews</code> (cost = &minus;reward)</td></tr>
+<tr><td>\(\lambda\)</td><td><span class="term">Temperature</span>. Small \(\lambda\) &rarr; sharp, greedy weighting; large \(\lambda\) &rarr; soft averaging.</td><td><code>temperature</code> = 0.3</td></tr>
+</table>
+
+<p><strong>Step 1 &mdash; sample.</strong> Draw \(N_W\) noise vectors and add each to the current guess:
+\(U^i + [W]_j\). In code the noise is drawn at sparse <em>knot points</em> and interpolated to the full
+horizon (smoother, fewer dimensions to sample):</p>
+
+<pre><code>knot_samples       = torch.randn_like(noise_scale) * noise_scale * global_noise_scale  # &larr; [W]_j
+delta_ctrl_samples = interp(knot_samples, knot_steps)
+ctrls_samples      = ctrls + delta_ctrl_samples                                        # &larr; U^i + [W]_j</code></pre>
+
+<p><strong>Step 2 &mdash; weight.</strong> Roll out all \(N_W\) candidates through physics, get cost
+\(J\) for each, and turn costs into weights with a softmax:
+\(w_j \propto \exp(-J_j/\lambda)\). Low cost &rarr; high weight.</p>
+
+<pre><code>top_rews_normalized = (top_rews - top_rews.mean()) / (top_rews.std() + 1e-2)
+top_weights = F.softmax(top_rews_normalized / temperature, dim=0)   # &larr; exp(-J/&lambda) / &Sigma; exp(-J/&lambda)</code></pre>
+
+<div class="note">
+<strong>Code vs. paper:</strong> Eq.&nbsp;2 sums over <em>all</em> \(N_W\) particles. The implementation only
+keeps the <strong>top&nbsp;10%</strong> by reward before the softmax (<code>torch.topk</code>), and standardizes
+them first. Same idea (CEM-style elite weighting), just a more stable practical variant.
+</div>
+
+<p><strong>Step 3 &mdash; update.</strong> The new guess is the old one plus the weighted average of the
+perturbations &mdash; exactly the fraction in Eq.&nbsp;2:</p>
+
+<pre><code>ctrls_mean = (weights[:, None, None] * ctrls_samples).sum(dim=0)    # &larr; U^(i+1)</code></pre>
+
+<h3>The annealing schedule (Eq. 3)</h3>
+
+<div class="eqbox">
+\[
+\Sigma_h^{i} \;=\; \exp\!\left(-\frac{N-i}{\beta_1 N} \;-\; \frac{H-h}{\beta_2 H}\right) I
+\]
+</div>
+<p class="eqlabel">Eq. 3 &mdash; how the sampling covariance shrinks</p>
+
+<p>\(\Sigma_h^i\) is the noise covariance used at <em>iteration \(i\)</em> and <em>horizon step \(h\)</em>.
+The two exponential terms make the search <span class="term">anneal</span> &mdash; start broad (explore),
+end narrow (refine) &mdash; along two independent axes:</p>
+
+<table>
+<tr><th>Term</th><th>Effect</th><th>In the code</th></tr>
+<tr><td>\(-\dfrac{N-i}{\beta_1 N}\)</td><td><span class="term">Outer-iteration decay.</span> Early iterations (\(i\) small) &rarr; large noise; later iterations (\(i\to N\)) &rarr; small noise. \(\beta_1\) controls how fast.</td><td><code>global_noise_scale = beta_traj**i</code><br>with <code>beta_traj = final_noise_scale**(1/max_num_iterations)</code></td></tr>
+<tr><td>\(-\dfrac{H-h}{\beta_2 H}\)</td><td><span class="term">Temporal decay.</span> Near-future steps (\(h\) small) get explored harder; far-future steps get less noise. \(\beta_2\) controls the falloff.</td><td><code>torch.logspace(first_ctrl_noise_scale, last_ctrl_noise_scale, steps=horizon/knot_dt)</code></td></tr>
+<tr><td>\(N,\,H\)</td><td>Total iterations, horizon length.</td><td><code>max_num_iterations</code>=16, <code>horizon_steps</code></td></tr>
+<tr><td>\(I\)</td><td>Identity &mdash; isotropic noise per dimension (then scaled per-DOF).</td><td><code>noise_scale</code> tensor, per-DOF scaled</td></tr>
+</table>
+
+<p>So the paper's single \(\Sigma_h^i\) is, in code, a product of two factors: a per-knot
+<em>logspace</em> profile over the horizon (\(h\)) times a geometric <em>per-iteration</em> factor
+<code>beta_traj**i</code> (\(i\)). Both shrink toward the end &mdash; exactly the
+&ldquo;broad &rarr; targeted&rdquo; refinement Eq.&nbsp;3 describes.</p>
+
+<div class="english">
+<strong>Section 2.2 in one sentence:</strong> repeatedly perturb the control sequence with shrinking noise,
+simulate thousands of perturbations in parallel, and step toward a softmax-weighted average of the
+cheapest ones &mdash; run inside a receding-horizon MPC loop.
+</div>
+
+<h2>Section 2.3 &mdash; Curriculum virtual contact guidance</h2>
+
+<p>This is the paper's key novelty. <strong>Problem:</strong> pure sampling struggles with contact-rich
+manipulation &mdash; if the hand never randomly stumbles onto a stable grasp, the object falls, every
+sample looks equally bad, and there's no gradient of progress to climb. <strong>Idea:</strong> early on,
+&ldquo;cheat&rdquo; by virtually <em>holding the object near its reference pose</em>, giving the sampler a
+feasible neighborhood to explore; then gradually remove the help so the final motion is purely physical.</p>
+
+<h3>The guided constraint (Eq. 4)</h3>
+
+<div class="eqbox">
+\[
+c_{k,t}\,\big\lVert\, {}^{\text{robot}}p_{k,t}^{\text{object}} \;-\; {}^{\text{robot}}p_{k,t}^{\text{object,ref}} \,\big\rVert_2^2 \;\le\; \eta_i
+\]
+</div>
+<p class="eqlabel">Eq. 4 &mdash; virtual contact constraint, relaxed by the curriculum</p>
+
+<div class="eqbox">
+\[
+c_{k,t} \;=\; \mathbb{1}\!\left(\big\lVert {}^{\text{robot}}p_{k,t}^{\text{object,ref}} \big\rVert_2 \le \varepsilon_{\text{contact}}\right)
+\]
+</div>
+<p class="eqlabel">contact indicator: 1 when reference says contact point k should be touching at time t</p>
+
+<table>
+<tr><th>Symbol</th><th>Meaning</th><th>In the code</th></tr>
+<tr><td>\(c_{k,t}\)</td><td><span class="term">Contact indicator</span> &mdash; 1 if reference contact point \(k\) is active at time \(t\), else 0. Only active contacts are guided.</td><td><code>contact</code> mask (from <code>detect_contact.py</code>)</td></tr>
+<tr><td>\({}^{\text{robot}}p_{k,t}^{\text{object}}\)</td><td>Current relative position between robot contact point \(k\) and the object.</td><td><code>site_xpos</code> at contact sites</td></tr>
+<tr><td>\({}^{\text{robot}}p_{k,t}^{\text{object,ref}}\)</td><td>Desired relative position from the reference.</td><td><code>contact_pos</code> reference</td></tr>
+<tr><td>\(\eta_i\)</td><td><span class="term">Tolerance</span> on the constraint at iteration \(i\). Small early (tight grip help), then \(\eta_i\to\infty\) as \(i\to N\) (constraint relaxes to nothing).</td><td>encoded as actuator <em>gain</em> decay (below)</td></tr>
+<tr><td>\(\varepsilon_{\text{contact}}\)</td><td>Distance threshold for deciding a point is &ldquo;in contact.&rdquo;</td><td>contact detection threshold</td></tr>
+</table>
+
+<p>The constraint says: <em>for each point the reference marks as in-contact, keep the robot&ndash;object
+relative geometry close to the reference, within tolerance \(\eta_i\).</em> It effectively
+<strong>&ldquo;sticks&rdquo;</strong> the hand to the object during early optimization. Crucially this is
+<em>not</em> a soft reward term &mdash; it <span class="green">enlarges the feasible basin</span> so the
+sampler is steered toward the correct contact sequence instead of having to discover it by luck.</p>
+
+<h3>The curriculum: how \(\eta_i\) is implemented (gain decay)</h3>
+
+<p>In code the constraint is realized with <strong>virtual object actuators</strong> (added to
+<code>scene_act.xml</code> by <code>generate_xml.py</code>) that pull the object toward its reference pose.
+Their stiffness \(K_p\) (and damping \(K_d\)) plays the role of <em>tightness</em>: high gain = tight
+constraint = small \(\eta\). The curriculum decays the gain geometrically each iteration and
+<strong>forces it to exactly zero on the last iteration</strong> &mdash; i.e. \(\eta_i\to\infty\), no help
+left:</p>
+
+<pre><code>for i in range(max_num_iterations):
+    decay = guidance_decay_ratio ** i        # e.g. 0.5**i  &rarr; shrinking stiffness (&eta;_i growing)
+    kp_i = base_kp * decay
+    kd_i = base_kd * decay
+    if i == max_num_iterations - 1:
+        kp_i = zeros_like(base_kp)            # final iter: guidance fully OFF (purely physical)
+        kd_i = zeros_like(base_kd)</code></pre>
+
+<div class="note">
+<strong>Verified, not assumed:</strong> at the start <em>and</em> end of a run the code asserts the object
+actuator gains are zero (<code>_assert_object_actuator_gains_zero</code>), guaranteeing the exported
+trajectory is held by the <em>hand's own physics</em>, not by the virtual helper. The helper exists only
+to shape the search during optimization.
+</div>
+
+<p>There's also a direct nudge: at each control tick the hand's position targets are shifted toward the
+measured contact points (<code>compute_contact_point_delta</code>), clipped to &plusmn;1&nbsp;cm, so the
+fingers move <em>onto</em> the contact locations while the curriculum is active.</p>
+
+<div class="english">
+<strong>Section 2.3 in one sentence:</strong> start optimization with a virtual &ldquo;magnet&rdquo; that
+keeps each active contact point glued to its reference (widening the feasible region for the sampler),
+then anneal that magnet's strength to zero so the final grasp is achieved by real physics alone.
+</div>
+
+<h2>The full method, end to end</h2>
+<ol>
+<li><strong>Eq. 1 (&sect;2.1)</strong> defines <em>what</em> to optimize: weighted tracking of the human reference, subject to physics.</li>
+<li><strong>Eq. 2&ndash;3 (&sect;2.2)</strong> defines <em>how</em>: sampling-based MPC with softmax-weighted updates and annealed noise.</li>
+<li><strong>Eq. 4 (&sect;2.3)</strong> makes contact-rich tasks solvable: a curriculum virtual-contact constraint that widens the feasible basin early and vanishes by the end.</li>
+</ol>
+<p>Human demos give the task structure; physics-based sampling grounds it in dynamic feasibility; virtual
+guidance preserves the contact intent &mdash; the three pieces of the paper's thesis.</p>
+
+<hr>
+<p style="color:var(--muted); font-size:0.9rem;">
+Generated for study of the SPIDER codebase. Open this file in any browser; equations render via MathJax (needs internet for the CDN).
+</p>
+
+</body>
+</html>

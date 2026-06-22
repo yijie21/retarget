@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Do As I Do — What's Actually Novel?</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --card2:#1e2230; --ink:#e7eaf0; --mut:#9aa3b2;
+    --reuse:#9aa3b2; --new:#7ef0c2; --warn:#ffcf6e; --blue:#6ea8fe; --pink:#ff8fb1; --line:#2a2f3a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:35px;line-height:1.15;margin:0 0 10px}
+  h1 .sub{display:block;font-size:17px;color:var(--mut);font-weight:400;margin-top:10px}
+  h2{font-size:25px;margin:54px 0 14px;padding-top:14px;border-top:1px solid var(--line)}
+  h3{font-size:19px;margin:24px 0 8px}
+  p{margin:12px 0}
+  a{color:var(--blue)}
+  .tag{display:inline-block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--blue);border:1px solid var(--line);border-radius:999px;padding:3px 10px;margin-right:6px}
+  .lead{font-size:18px;color:#cfd6e2}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;
+    background:#0b0d12;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#cfe2ff}
+  .pill{font-size:12.5px;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  .reuse{color:var(--reuse)} .new{color:var(--new);font-weight:600}
+  .chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;margin-left:4px;vertical-align:middle}
+  .chip.r{background:#20242e;color:#9aa3b2;border:1px solid #2a2f3a}
+  .chip.n{background:#13302a;color:#7ef0c2;border:1px solid #285043}
+  .verdict{background:linear-gradient(180deg,#141a16,#131722);border:1px solid #285043;border-left:4px solid var(--new);
+    border-radius:12px;padding:18px 22px;margin:18px 0}
+  .warnote{background:#1c1a12;border:1px solid #3a341f;border-radius:10px;padding:12px 16px;color:#efe6c6;font-size:14.5px}
+  .evidence{background:#0b0d12;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;
+    padding:10px 14px;margin:10px 0;font-size:13px;color:#bcd0ee}
+  .evidence b{color:#dce8fb}
+  .flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:16px 0}
+  .step{flex:1;min-width:120px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .step .n{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--mut)}
+  .step b{display:block;margin:3px 0 5px;font-size:14px}
+  .step span{font-size:12px;color:var(--mut)}
+  .arrow{align-self:center;color:var(--mut);font-size:18px}
+  ul{margin:10px 0;padding-left:22px} li{margin:6px 0}
+  .grade{font-size:13px;color:var(--mut);margin-top:4px}
+  .footer{margin-top:60px;color:var(--mut);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
+  .legend{font-size:13px;color:var(--mut);margin:8px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">Paper + code audit</span>
+  <span class="tag">arXiv 2606.19333</span>
+  <h1>Do As I Do — where is the actual novelty?
+    <span class="sub"><i>“Do as I Do: Dexterous Manipulation Data from Everyday Human Videos”</i>
+    (Paliwal, Etukuru, Liang, Abbeel, Shafiullah, Malik). Your hunch was that reconstruction is just
+    off-the-shelf parts glued together and retargeting is just SPIDER. Here's how that holds up against
+    the paper <b>and</b> the code in <code>/home/user2/code/do-as-i-do</code>.</span>
+  </h1>
+
+  <div class="verdict">
+    <p class="lead" style="margin-top:0">Short answer: your instinct is <b>half right</b>.</p>
+    <p>The <b>building blocks</b> really are off-the-shelf, and the retargeter really is <b>SPIDER</b>
+    (the repo literally says <code>"built on SPIDER"</code>). But the novelty isn't supposed to be the blocks —
+    it lives <b>in the seams</b>, and the seams are real, non-trivial, and ablation-validated:</p>
+    <ul>
+      <li><b>Reconstruction:</b> turning a <i>single-frame</i> 3D model (SAM-3D) into a <i>temporally-coherent
+      6-DoF video tracker</i> via guided diffusion, plus a <i>hand-anchored metric-scale</i> trick that resolves
+      monocular scale ambiguity. That's a genuine algorithmic idea, not glue.</li>
+      <li><b>Retargeting:</b> three robustification components bolted onto SPIDER (<i>warmup</i>,
+      <i>force perturbation</i>, <i>transition/contact reward</i>) that make it survive <b>noisy reconstructed</b>
+      references — SPIDER alone scores 25%, with these 71%.</li>
+      <li><b>The "playbook":</b> the empirical finding that only ~4% of internet clips are usable — a contribution
+      in its own right.</li>
+    </ul>
+    <p style="margin-bottom:0">So it's best read as a <b>systems paper with two algorithmic seams</b>, claiming
+    <i>“the first pipeline from an internet video to real dexterous-hand rollouts.”</i> Whether that's "innovative
+    enough" is a taste call — but "just a combination" undersells where the work actually is.</p>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>1. The full pipeline (and what is borrowed vs. new)</h2>
+  <p class="legend"><span class="chip r">REUSED</span> existing model/method, used as-is &nbsp;
+  <span class="chip n">NEW</span> first-party contribution of this paper</p>
+
+  <div class="flow">
+    <div class="step"><div class="n">VIDEO IN</div><b>RGB monocular</b><span>ego or exo, internet or recorded</span></div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:#3a4a3f"><div class="n">STAGE A</div><b>Reconstruction</b>
+      <span>hand + object 3D + 6-DoF pose per frame</span></div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:#3a4a3f"><div class="n">STAGE B</div><b>Retargeting</b>
+      <span>physics-feasible robot-hand + object trajectory</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">STAGE C</div><b>Deployment</b><span>dual UR3e + Sharpa Wave hands @ 50 Hz</span></div>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>2. Reconstruction — “just a combination”? Mostly borrowed, but two real ideas</h2>
+
+  <table>
+    <tr><th>Component</th><th>Role</th><th>Origin</th></tr>
+    <tr><td class="reuse">SAM 3</td><td>segment the object (click) + hand (text)</td><td><span class="chip r">REUSED</span> Meta</td></tr>
+    <tr><td class="reuse">SAM-3D-Objects</td><td>single-image → 3D object mesh</td><td><span class="chip r">REUSED</span> Meta</td></tr>
+    <tr><td class="reuse">MoGe</td><td>monocular pointmaps (relative geometry)</td><td><span class="chip r">REUSED</span></td></tr>
+    <tr><td class="reuse">HaWoR</td><td>hand reconstruction in world frame (MANO)</td><td><span class="chip r">REUSED</span></td></tr>
+    <tr><td class="reuse">TAPIR / BootsTAPIR</td><td>2D point tracking across frames</td><td><span class="chip r">REUSED</span> DeepMind</td></tr>
+    <tr><td class="reuse">GeoCalib</td><td>gravity / up-vector estimation</td><td><span class="chip r">REUSED</span></td></tr>
+    <tr><td class="new">Guided-diffusion 6-DoF tracker</td><td>make SAM-3D temporally consistent across the video</td><td><span class="chip n">NEW</span></td></tr>
+    <tr><td class="new">Adaptive guidance from 2D velocity</td><td>set tracking stiffness from TAPIR rotational velocity</td><td><span class="chip n">NEW</span></td></tr>
+    <tr><td class="new">Hand-anchored metric placement</td><td>resolve monocular scale by anchoring to the metric hand</td><td><span class="chip n">NEW</span></td></tr>
+  </table>
+
+  <h3>Novel idea #1 — repurpose a single-frame 3D model into a video tracker</h3>
+  <p>SAM-3D reconstructs an object from <i>one</i> image. Run it per-frame and you get a different, jittering shape
+  every frame (temporal incoherence). The paper's move: <b>fix the object's shape at an anchor frame</b>, then
+  <b>optimize only its pose</b> across frames by steering SAM-3D's diffusion sampling — blending the diffusion
+  velocity toward (a) the canonical anchor shape and (b) the previous frame's pose. The guidance strength isn't a
+  fixed hyperparameter; it's <b>adapted from the object's 2D rotational velocity</b> measured by TAPIR (so a fast
+  spin loosens the prior, a still object tightens it — avoiding both over-rigidity and spurious flips).</p>
+  <div class="evidence">📂 <b>Code evidence:</b> <code>scripts/tapir_velocity_tracking.py</code> tracks the object with
+  BootsTAPIR and "estimates translation + rotation velocity via SVD rigid fitting" — that velocity is exactly the
+  adaptive-guidance signal. The guided sampler itself is in the <code>modules/Fast-SAM3D/track_object.py</code>
+  fork (the "guided pose prediction" stage). <span class="reuse">(I read the first-party velocity script directly;
+  the diffusion sampler lives in the submodule and is described by the paper/README.)</span></div>
+
+  <h3>Novel idea #2 — get <i>metric</i> placement from a monocular video</h3>
+  <p>Monocular reconstruction has an unknown global scale — you can't tell a small mug up close from a big mug far
+  away. The trick: the <b>HaWoR hand is metric</b> (real MANO size), so use it as a ruler. Compare the hand's depth
+  in the MoGe pointmap vs. its true HaWoR depth to recover the pointmap-to-real scale, then place the object metrically
+  relative to the hand.</p>
+  <div class="evidence">📂 <b>Code evidence (read directly):</b> <code>scripts/optimize_translation_scale.py</code> —
+  <i>"The anchor hand mesh from HaWoR is treated as ground truth … compute the pointmap-to-real scale factor per frame …
+  then use the scaled hand-to-object vector to place the object."</i> Steps: <code>k = h_real_z / h_pm_z</code>,
+  <code>obj_pos = h_real + k·(o_pm − h_pm)</code>. This is a clean, real contribution — not stitching.</div>
+
+  <p class="grade"><b>Verdict on reconstruction:</b> ~6 of 8 components are off-the-shelf, so calling it "a
+  combination" is fair at the parts level. But the two NEW pieces are what make it <i>work as a tracker</i> and what
+  the paper uses to beat FoundationPose / Any6D. The contribution is real; it's just concentrated.</p>
+
+  <!-- ============================================================= -->
+  <h2>3. Retargeting — yes, it <i>is</i> SPIDER… plus three things that matter</h2>
+
+  <div class="warnote">⚙️ You're correct: <code>retargeting/README.md</code> states <i>"This codebase is built on
+  <b>SPIDER</b>."</i> The core — sampling-based MPC physics optimization in MuJoCo Warp (stage 5) — is SPIDER's
+  framework, unchanged in spirit. The novelty is a robustification layer for <b>noisy, reconstructed</b> input
+  (SPIDER was built for clean MoCap).</div>
+
+  <p>SPIDER assumes a fairly clean reference trajectory. A reference reconstructed from RGB video is noisy: the
+  initial grasp may interpenetrate, contacts drift, pick/place moments are imprecise. Three additions fix exactly
+  those failure modes:</p>
+
+  <h3>① Warmup <span class="pill">init-failure fix</span></h3>
+  <p>Before tracking starts, prepend a phase that <b>holds the object fixed</b> (weld constraints + zero gravity) and
+  lets the robot hand <b>reposition from an open pose into a valid grasp</b>, interpolating the reference in over a
+  few steps — instead of snapping to a possibly-penetrating first frame. No grasp-specific heuristics needed.</p>
+  <div class="evidence">📂 <code>optimize_physics.py</code>: <code>warmup_analytical_init</code> (translate wrist along
+  −palm_normal, open fingers), <code>warmup_weld_eq_ids</code> + "zero gravity for N steps", <code>warmup_ref_interp</code>
+  for base &amp; fingers. Config: <code>warmup_duration</code>, <code>warmup_min_clearance</code>,
+  <code>warmup_ramp_duration</code> in <code>override/do_as_i_do.yaml</code>. <b>Paper ablation: 25% → 66% success
+  from warmup alone.</b></div>
+
+  <h3>② Random force/torque perturbation <span class="pill">grasp-robustness</span></h3>
+  <p>During rollouts, apply <b>stochastic disturbances</b> to the object so the optimizer is pushed toward grasps that
+  actually <i>hold</i> under perturbation (sim-to-real style). Crucially, perturbations are <b>gated to fire only deep
+  inside a stable hold</b>, never during reach-in or set-down.</p>
+  <div class="evidence">📂 Config: <code>num_perturb_samples</code>, <code>perturb_force_scale</code>,
+  <code>perturb_torque_scale</code>, <code>perturb_prob</code>, <code>perturb_continue_prob</code>.
+  Gating: <code>utils/in_hand.py → erode_mask()</code> — "disturbances fire only well inside a stable hold."</div>
+
+  <h3>③ Transition / contact reward <span class="pill">pick-place fix</span></h3>
+  <p>Detect the manipulation <b>phase</b> per frame — object <i>in-hand</i> vs. <i>resting</i> on a pedestal/floor —
+  and reward the correct contact state in each: hand-object contact during in-hand phases, object-floor/pedestal
+  contact during rest. This stops the classic failure where the robot "almost" picks up or drops early.</p>
+  <div class="evidence">📂 <code>utils/in_hand.py</code> (read in full): <code>compute_in_hand_mask</code>,
+  <code>compute_near_floor_mask</code>, <code>compute_near_pedestal_mask</code> (finite-cylinder footprint test),
+  consumed by <code>optimize_physics.py → _gate_state_lane()</code> which labels each frame
+  <code>1=in-hand / 2=resting / 0=neither</code>. This is ~300 lines of real phase logic, not a stub.</div>
+
+  <p class="grade"><b>Verdict on retargeting:</b> the engine is SPIDER — you're right. But these three components are
+  the difference between SPIDER failing on video-derived references (25%) and the system working (71%). They target
+  reconstruction noise specifically, which is the whole point of the paper.</p>
+
+  <!-- ============================================================= -->
+  <h2>4. The third contribution you may have skipped: the “playbook”</h2>
+  <div class="card">
+    <p>A genuinely useful empirical result, separate from any algorithm: of ~2,000 clips from the 100DOH internet-video
+    dataset, only <b>~9% contain meaningful hand-object interaction</b> and only <b>~4% survive quality checks</b> for
+    reconstruction (hand/object leaving frame, shot boundaries, excessive camera motion, SAM-3D failures). They frame
+    this as a <b>~20× penalty</b> for not preprocessing internet video properly. For anyone planning to "just use
+    internet videos," this is a concrete, money-saving finding.</p>
+  </div>
+
+  <!-- ============================================================= -->
+  <h2>5. Reported results (from the paper)</h2>
+  <table>
+    <tr><th>Benchmark</th><th>This paper</th><th>Prior SOTA</th></tr>
+    <tr><td>DexYCB — F-10 ↑ / Chamfer ↓</td><td class="new">0.93 / 0.66</td><td class="reuse">0.91 / 0.89 (Any6D / FoundationPose)</td></tr>
+    <tr><td>HOI4D — F-10 ↑ / Chamfer ↓</td><td class="new">0.91 / 0.49</td><td class="reuse">0.91 / 0.50</td></tr>
+    <tr><td>In-the-wild (150 vids) — human preference</td><td class="new">67% prefer</td><td class="reuse">vs FoundationPose</td></tr>
+    <tr><td>Retargeting on reconstructed refs — success</td><td class="new">71%</td><td class="reuse">25% (SPIDER alone)</td></tr>
+    <tr><td>Retargeting on OakInk2 (clean MoCap) — success</td><td class="new">81%</td><td class="reuse">72% (SPIDER alone)</td></tr>
+  </table>
+  <p class="legend">Tell-tale sign the additions target noise: the gain is huge on <b>noisy reconstructed</b> refs
+  (+46 pts) and modest on <b>clean</b> MoCap (+9 pts).</p>
+
+  <!-- ============================================================= -->
+  <h2>6. So — is it innovative? An honest take</h2>
+  <div class="card">
+    <p><b>If you measure novelty by "new model architectures":</b> no — almost every model is borrowed, and the
+    retargeting engine is SPIDER. Your coarse read is defensible at this level.</p>
+    <p><b>If you measure novelty by "new capability + the ideas that unlock it":</b> yes — it's the first end-to-end
+    <i>internet-video → real dexterous-robot rollout</i> pipeline, and it required two real algorithmic inventions
+    (guided-diffusion 6-DoF tracking; hand-anchored metric scale) plus three reconstruction-noise robustifications to
+    SPIDER. The ablations show those aren't cosmetic.</p>
+    <p style="margin-bottom:0">This is a classic, legitimate <b>systems-paper</b> shape: the value is in making the
+    whole chain work on messy real data, and the "innovation" is distributed across the seams rather than sitting in
+    one headline module. If you're judging it for a review or deciding whether to build on it, the fair critique isn't
+    "it's just a combination" — it's "are the seam-level contributions (guided tracker, hand-anchored scale, the three
+    SPIDER add-ons) strong enough on their own?" — and the ablation numbers are the evidence to argue about.</p>
+  </div>
+
+  <div class="footer">
+    Grounded in: the paper (arXiv 2606.19333, abstract + HTML), and a direct read of the repo —
+    <code>retargeting/retargeting/utils/in_hand.py</code>, <code>retargeting/retargeting/pipeline/optimize_physics.py</code>,
+    <code>retargeting/config/{default,override/do_as_i_do}.yaml</code>,
+    <code>reconstruction/scripts/{tapir_velocity_tracking,optimize_translation_scale}.py</code>, and all three
+    component READMEs. The guided-diffusion sampler in <code>modules/Fast-SAM3D/track_object.py</code> is a submodule
+    I did not open line-by-line — that one claim rests on the paper + README, while the first-party scripts above I
+    verified directly. Quantitative figures are as reported by the paper.
+  </div>
+
+</div>
+</body>
+</html>

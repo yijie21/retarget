@@ -1,0 +1,21 @@
+torch
+torchvision
+torchaudio
+numpy
+scipy
+# GeoRT is written against the SAPIEN 2.x API (sapien.Engine, sapien.VulkanRenderer,
+# the old SceneConfig fields, the old Viewer). SAPIEN 3.x renamed/removed these and
+# will fail with errors like "module 'sapien.core' has no attribute 'VulkanRenderer'".
+# Do NOT upgrade to 3.x without porting geort/env/hand.py first.
+sapien>=2.2,<3
+# SAPIEN 2.x imports pkg_resources at startup, which setuptools>=81 removed.
+setuptools<81
+gym
+tqdm
+open3d
+trimesh
+zmq
+# Browser-based (headless) visualization demos: hand_viser.py, compare_viser.py, replay_viser.py.
+# These do NOT need SAPIEN or a GPU.
+viser
+yourdfpy

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# License-restricted — must NOT be redistributed publicly. Download / generate locally.
+#   MANO models: Max-Planck license forbids making them (or derived data) available to third parties.
+#   GRAB / FürElise: licensed datasets; their derived .npy/.npz are also restricted.
+assets/mano_v1_2/
+data/*
+!data/.gitkeep
+# Bundled demo data for the side-by-side comparison (see DATA_NOTICE.md for attribution):
+#   - mano_gesture: synthetic gesture we generate from MANO
+#   - furelise_demo: short clip derived from FürElise (CC BY-NC 4.0, attributed)
+#   - grab_*: clips from the GRAB dataset (non-commercial, redistribution forbidden) —
+#     bundled ONLY because this repo is PRIVATE. Do NOT make the repo public with these.
+!data/mano_gesture.npy
+!data/mano_gesture_mano.npz
+!data/mano_gesture_qpos.npy
+!data/furelise_demo.npy
+!data/furelise_demo_mano.npz
+!data/furelise_demo_qpos.npy
+!data/grab_s2_stapler.npy
+!data/grab_s2_stapler_mano.npz
+!data/grab_s2_stapler_qpos.npy
+!data/grab_mug_drink.npy
+!data/grab_mug_drink_mano.npz
+!data/grab_mug_drink_qpos.npy
+!data/grab_teapot_pour.npy
+!data/grab_teapot_pour_mano.npz
+!data/grab_teapot_pour_qpos.npy
+checkpoint/*
+!checkpoint/.gitkeep
+# Bundled pretrained Wuji retargeting checkpoint so compare_viser runs after clone:
+!checkpoint/wuji_mano/
+!checkpoint/wuji_mano/**
+
+# Large / not needed to run the visualization demos
+assets/wuji-hand-description/
+# (hand_landmarker.task IS tracked — the live camera demo needs the MediaPipe model.)
+
+# Proprietary / large binaries (Manus glove SDK) — not needed for the demo
+*.so
+*.so.*
+geort/mocap/manus_client/lib/
+
+# User-specific dataset storage (symlink to an external volume)
+hf_datasets
