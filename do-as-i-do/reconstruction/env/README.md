@@ -1,5 +1,52 @@
 # Conda environments
 
+By default the pipeline switches between **4 conda envs** (names set in `config/paths.sh`).
+You can also run **everything in ONE env** — see [Single-environment setup](#single-environment-setup) below.
+
+## Single-environment setup
+
+The 4-env split exists only because the four upstream repos (SAM3, SAM3D, HaWoR, TAPnet)
+ship independent dependency trees — *not* because of a hard incompatibility. They all use
+**cu128 + torch 2.7–2.9**, so a single **Python 3.11 / torch 2.8.0+cu128** env runs all of
+reconstruction **and** retargeting.
+
+**Build it** (the `sam3d` env is the hard part — it has the from-source CUDA builds; the script
+copies it and layers the rest on top):
+
+```bash
+# 1. Build the sam3d env first (env/sam3d.yml + the pytorch3d / kaolin / diff-gaussian /
+#    geocalib steps in this file). It is torch 2.8.0+cu128 / Python 3.11.
+# 2. Then consolidate into one env named `daid`:
+./setup/03_single_env.sh            # copies sam3d -> daid, layers sam3 + hawor + tapnet + retargeting
+```
+
+What `03_single_env.sh` does (and the gotchas it encodes):
+- Copies `sam3d` → `daid` (a plain `cp -a` of the env dir — `conda create --clone` re-solves and
+  is pathologically slow on this env).
+- Adds the retargeting package (`pip install -e retargeting`; its `pyproject.toml` now allows
+  Python ≥ 3.11), TAPIR (torch path; **no JAX needed for tracking**), the SAM3 package + CLIP
+  BPE assets, and HaWoR's deps (`smplx`, `torch-scatter` from the pyg pt28 index, `chumpy` from git).
+- **The one real conflict to know about:** TAPIR's `jax` pulls **numpy 2.x**, but every CUDA
+  extension (pytorch3d/kaolin/geocalib/mujoco-warp/spconv) is built against **numpy 1.26** — so
+  the script pins `numpy==1.26.4` and uses a numpy-1.26-compatible `jax==0.4.30`/`chex==0.1.86`.
+  (`timm` 0.9.16 vs the SAM3 pin ≥1.0.17 is only a warning — SAM3 runs fine on 0.9.16.)
+
+**Run it** (one env, no per-stage switching). `config/paths.sh` honours pre-set env names:
+
+```bash
+conda activate daid
+cd reconstruction
+ENV_SAM3=daid ENV_SAM3D=daid ENV_HAWOR=daid ENV_TAPNET=daid \
+  ./run_pipeline_headless.sh whisking/whisking.mp4 28 knife right     # all stages in `daid`
+
+cd ../retargeting
+python launch.py --task whisking --raw-dir ../reconstruction/whisking # same env
+```
+
+---
+
+## The 4-environment setup (default)
+
 The pipeline switches between **4 conda envs** (names set in `config/paths.sh`).
 
 **Recommended:** build each env by following its fork's own setup instructions —

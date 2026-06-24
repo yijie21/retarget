@@ -43,6 +43,11 @@ its fork's own setup instructions (the repos vendored under `modules/`):
 
 See [`env/README.md`](env/README.md) for the per-env cu128 recipes (or `./setup/01_create_envs.sh` to script them).
 
+**Prefer one env?** You can run the entire pipeline (reconstruction **and** retargeting) in a
+**single** Python 3.11 / torch 2.8 conda env instead of four — build it with
+`./setup/03_single_env.sh` and see [`env/README.md` › Single-environment setup](env/README.md#single-environment-setup).
+Then point all stages at it: `ENV_SAM3=daid ENV_SAM3D=daid ENV_HAWOR=daid ENV_TAPNET=daid ./run_pipeline_headless.sh …`.
+
 After the `sam3d` env is built, two manual Stage-2 steps are needed: un-shadow the repo's
 `notebook/` package (`pip uninstall -y notebook`) and build the Mip-Splatting
 `diff_gaussian_rasterization` for the renderer's `inria` backend. Commands in

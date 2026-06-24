@@ -376,7 +376,7 @@ def _add_pose_axes(
 
 def init_viser(
     app_name: str = "retargeting",
-    port: int | None = None,
+    port: int | None = 8090,  # 8080 is taken by jupyter in this environment
 ) -> None:
     if _STATE.server is not None:
         return

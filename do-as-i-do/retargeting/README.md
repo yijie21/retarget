@@ -40,6 +40,12 @@ pip install -e .
 
 See [`env/README.md`](env/README.md) for exact-pin details.
 
+**One env for everything?** Retargeting can share a single conda env with the reconstruction
+pipeline (Python 3.11 / torch 2.8). Build it with `reconstruction/setup/03_single_env.sh` and see
+[`reconstruction/env/README.md` › Single-environment setup](../reconstruction/env/README.md#single-environment-setup);
+then just `conda activate daid` and run `launch.py` as below. The only code change needed was
+relaxing `requires-python` to `>=3.11` in `pyproject.toml` (done).
+
 ## Run
 
 First run the reconstruction pipeline on a video (e.g. the whisking demo), then from the

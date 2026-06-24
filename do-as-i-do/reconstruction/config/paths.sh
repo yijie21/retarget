@@ -21,14 +21,16 @@ export SAM3D_REPO_ROOT="$FASTSAM3D_DIR"
 export WEIGHTS_DIR="$RECON_ROOT/weights"
 export TAPNET_CKPT="$WEIGHTS_DIR/tapnet/bootstapir_checkpoint_v2.pt"
 
-# ── Conda env names (4 separate environments) ──
-# Defaults match what `setup/01_create_envs.sh` creates. If you are reusing the
-# pre-existing local envs, your sam3d env may be named differently
-# (sam3 / hawor / tapnet already match) — set ENV_SAM3D accordingly.
-export ENV_SAM3=sam3
-export ENV_SAM3D=sam3d
-export ENV_HAWOR=hawor
-export ENV_TAPNET=tapnet
+# ── Conda env names ──
+# Defaults match what `setup/01_create_envs.sh` creates. These respect values
+# pre-set in the environment, so you can run every stage in ONE consolidated env:
+#   export ENV_SAM3=daid ENV_SAM3D=daid ENV_HAWOR=daid ENV_TAPNET=daid
+# (see env/README.md "Single-environment setup"). If you are reusing pre-existing
+# local envs with different names, set these accordingly.
+export ENV_SAM3="${ENV_SAM3:-sam3}"
+export ENV_SAM3D="${ENV_SAM3D:-sam3d}"
+export ENV_HAWOR="${ENV_HAWOR:-hawor}"
+export ENV_TAPNET="${ENV_TAPNET:-tapnet}"
 
 # ── Host / GPU ──
 export CUDA_VISIBLE_DEVICES=0
