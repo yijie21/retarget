@@ -11,6 +11,7 @@ to produce a physically-consistent robot hand + object trajectory.
 ```
 retargeting/
 ├── launch.py                # the sole entry point (5-stage pipeline)
+├── render_comparison.py     # optional: side-by-side demo-vs-retarget comparison video
 ├── pyproject.toml           # pip package (install with `pip install -e .`)
 ├── config/
 │   ├── default.yaml         # optimizer/simulator defaults
@@ -84,6 +85,33 @@ Written under `outputs/` (relative to the `retargeting/` directory):
 - `outputs/{robot}/{hand}/{task}/0/trajectory_kinematic.npz` — IK trajectory (stage 4)
 - `outputs/{robot}/{hand}/{task}/0/trajectory_mjwp.npz` + `config.yaml` — optimized trajectory
   (with per-step tracking-error metrics stored in the `.npz`) and the resolved run config (stage 5)
+- `outputs/{robot}/{hand}/{task}/0/comparison_{task}.mp4` — optional side-by-side comparison
+  video (see below)
+
+## Comparison video (optional)
+
+Render a side-by-side video — **original demo (left)** vs. the **retargeted robot hand +
+object (right)** — from the optimized `trajectory_mjwp.npz`. Runs headlessly (MuJoCo + EGL);
+needs `ffmpeg` (already in the `daid` env) and the original demo clip.
+
+```bash
+# after launch.py has produced trajectory_mjwp.npz for this task:
+python render_comparison.py --task whisking --raw-dir ../reconstruction/whisking
+# → outputs/{robot}/{hand}/{task}/0/comparison_{task}.mp4
+```
+
+It renders the optimized trajectory with an auto-framed, object-tracking camera (reference
+target markers hidden), then composes the two panels length-matched with labels. Useful flags:
+
+- `--output-dir DIR` / `--orig-video FILE` — set paths explicitly instead of deriving from `--task`/`--raw-dir`
+- `--robot sharpa --hand right` — pick the run (defaults shown)
+- `--trim-warmup` — skip the optimizer's warmup prefix so the right panel starts at the manipulation
+- `--azimuth / --elevation / --zoom / --fps` — tune the camera and output
+
+Headless GL note: the script sets `MUJOCO_GL=egl` and auto-selects a working EGL device (some
+hosts expose several EGL devices and only the GPU ones can create a desktop-GL context). On a
+host with no GPU GL libs at all, run `install-display-drivers` first. Override the device with
+`MUJOCO_EGL_DEVICE_ID=<n>` if needed.
 
 ## Credits & licenses
 

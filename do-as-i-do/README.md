@@ -54,5 +54,14 @@ python launch.py --task whisking --raw-dir ../reconstruction/whisking   # add --
 # → outputs/<robot>/<hand>/<task>/0/trajectory_mjwp.npz  (the optimized robot-hand + object trajectory)
 ```
 
+**4. (Optional) Export a side-by-side comparison video** — original demo (left) vs. the
+retargeted robot hand + object (right), rendered headlessly from the optimized trajectory:
+
+```bash
+# still in retargeting/
+python render_comparison.py --task whisking --raw-dir ../reconstruction/whisking
+# → outputs/<robot>/<hand>/<task>/0/comparison_<task>.mp4
+```
+
 That `trajectory_mjwp.npz` is the input to [`deployment/`](deployment/README.md) for real-robot replay.
 

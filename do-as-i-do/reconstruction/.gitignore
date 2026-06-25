@@ -18,6 +18,7 @@ modules/sam3/output/
 
 # Pipeline run outputs (reconstruction is written next to the input video — large,
 # fully reproducible by re-running run_pipeline*.sh). Never commit.
+runs/
 clean_release/
 all_frames/
 video_segmentation/
