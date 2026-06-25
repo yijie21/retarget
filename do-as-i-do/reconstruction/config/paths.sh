@@ -33,6 +33,6 @@ export ENV_HAWOR="${ENV_HAWOR:-hawor}"
 export ENV_TAPNET="${ENV_TAPNET:-tapnet}"
 
 # ── Host / GPU ──
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 # X display used by the click-based SAM3 segmentation UI (Stage 1).
 export SAM3_DISPLAY=:1

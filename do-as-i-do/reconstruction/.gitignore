@@ -16,6 +16,19 @@ modules/HaWoR/_DATA/
 # Vendored sam3 package: drop generated outputs
 modules/sam3/output/
 
+# Pipeline run outputs (reconstruction is written next to the input video — large,
+# fully reproducible by re-running run_pipeline*.sh). Never commit.
+clean_release/
+all_frames/
+video_segmentation/
+obj_tracking_out/
+perframe_tracking_*/
+tracking_output_every_frame/
+*_pointmap.npy
+*_intrinsics.txt
+*_intrinsics.npy
+output_tapir_*
+
 # OS / editor
 .DS_Store
 *.swp
